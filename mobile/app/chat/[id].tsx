@@ -254,15 +254,7 @@ export default function ChatScreen() {
         }
     };
 
-    const tagsStyles = {
-        body: { color: '#333', fontSize: 15 },
-        p: { margin: 0, padding: 0 }
-    };
 
-    const myMessageTagsStyles = {
-        body: { color: 'white', fontSize: 15 },
-        p: { margin: 0, padding: 0 }
-    };
 
     const renderMessageContent = (item: Message, isMyMessage: boolean) => {
         const textColor = isMyMessage ? '#fff' : '#333';
@@ -273,13 +265,27 @@ export default function ChatScreen() {
         // Default to 'text' if type is undefined (for old messages)
         const messageType = item.type || 'text';
 
+        const baseTagsStyles = {
+            body: { color: isMyMessage ? '#fff' : '#333', fontSize: 15 },
+            p: { margin: 0, padding: 0 },
+            ul: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
+            ol: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
+            li: { marginBottom: 2 },
+            b: { fontWeight: 'bold' as 'bold' }, // Cast to satisfy TS if needed, or just string
+            strong: { fontWeight: 'bold' as 'bold' },
+            i: { fontStyle: 'italic' as 'italic' },
+            em: { fontStyle: 'italic' as 'italic' },
+            u: { textDecorationLine: 'underline' as 'underline' },
+        };
+
         if (messageType === 'text' || !item.attachment_path) {
             // Show content as text (includes old messages without type)
             return (
                 <RenderHtml
                     contentWidth={width * 0.7}
                     source={{ html: item.content || '<p></p>' }}
-                    tagsStyles={isMyMessage ? myMessageTagsStyles : tagsStyles}
+                    tagsStyles={baseTagsStyles}
+                    systemFonts={['System', 'Roboto', 'Arial']} // Ensure fonts are available
                 />
             );
         } else if (item.type === 'image' && item.attachment_path) {
@@ -294,7 +300,8 @@ export default function ChatScreen() {
                         <RenderHtml
                             contentWidth={width * 0.7}
                             source={{ html: item.content }}
-                            tagsStyles={isMyMessage ? myMessageTagsStyles : tagsStyles}
+                            tagsStyles={baseTagsStyles}
+                            systemFonts={['System', 'Roboto', 'Arial']}
                         />
                     )}
                 </View>
@@ -350,7 +357,7 @@ export default function ChatScreen() {
             />
 
             {/* Input Section at BOTTOM */}
-            <View style={[styles.inputSection, { paddingBottom: Platform.OS === 'android' ? Math.max(8, keyboardHeight) : 8 }]}>
+            <View style={[styles.inputSection, { paddingBottom: Platform.OS === 'ios' ? Math.max(8, keyboardHeight) : 8 }]}>
                 {/* Attachment Preview */}
                 {attachment && (
                     <View style={styles.previewContainer}>
