@@ -25,6 +25,14 @@ export default function HomeScreen() {
     checkLogin();
   }, []);
 
+  // Poll for updates every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAccountants();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const checkLogin = async () => {
     const token = await SecureStore.getItemAsync('token');
     if (!token) {

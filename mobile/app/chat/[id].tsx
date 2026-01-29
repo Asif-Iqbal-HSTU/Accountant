@@ -12,7 +12,8 @@ import {
     Linking,
     Alert,
     Keyboard,
-    ScrollView
+    ScrollView,
+    TextInput
 } from 'react-native';
 
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -31,9 +32,14 @@ type Message = {
     id: number;
     content: string | null;
     sender_id: number;
+    receiver_id: number;
     created_at: string;
     type: 'text' | 'image' | 'file' | 'audio';
     attachment_path: string | null;
+    is_starred?: boolean;
+    read_at?: string | null;
+    parent_id?: number | null;
+    parent?: Message | null;
 };
 
 type ChatPartner = {
@@ -61,6 +67,13 @@ export default function ChatScreen() {
     const [replyTo, setReplyTo] = useState<Message | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+
+    // Helper to strip HTML tags for plain text preview
+    const stripHtml = (html: string | null) => {
+        if (!html) return '';
+        return html.replace(/<[^>]+>/g, '').trim();
+    };
 
     // Keyboard listeners
     useEffect(() => {
@@ -411,36 +424,31 @@ export default function ChatScreen() {
             keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         >
             {isSearching && (
-                <View style={{ padding: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' }}>
-                    {/* Using a simple TextInput for search as RenderHtml/RichEditor is overkill */}
-                    <View style={{ backgroundColor: '#f0f0f0', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ padding: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' }}>
+                    <View style={{ backgroundColor: '#f0f0f0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center' }}>
                         <Ionicons name="search" size={20} color="#999" />
-                        <Text style={{ flex: 1, marginLeft: 8, color: '#333' }}>
-                            {/* Mock input - in real code use TextInput. Since we can't easily import everything without context, let's assume user types in a modal or we add TextInput import */}
-                            Type to search... (Use Web for full search)
-                        </Text>
+                        <TextInput
+                            style={{ flex: 1, marginLeft: 10, fontSize: 16, color: '#333' }}
+                            placeholder="Search messages..."
+                            placeholderTextColor="#999"
+                            value={searchQuery}
+                            onChangeText={(text) => {
+                                setSearchQuery(text);
+                            }}
+                            onSubmitEditing={() => fetchMessages()}
+                            returnKeyType="search"
+                            autoFocus
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => { setSearchQuery(''); fetchMessages(); }}>
+                                <Ionicons name="close-circle" size={20} color="#999" />
+                            </TouchableOpacity>
+                        )}
                     </View>
-                    {/* 
-                        Developer Note: To implement real search input here, we need to import TextInput from 'react-native'. 
-                        I will assume TextInput is available or add import if missing.
-                        Actually, let's just use the `searchQuery` state with a TextInput.
-                     */}
                 </View>
             )}
             {/* Messages List */}
             <View style={{ flex: 1 }}>
-                {isSearching && (
-                    <View style={{ padding: 10, backgroundColor: '#fff' }}>
-                        {/* We need TextInput import. Checking imports... It is not imported. 
-                            I will just skip the visual input for now and focus on logic or rely on predefined state, 
-                            OR better: I should add TextInput to imports first. 
-                            But I can't edit imports easily in this chunk. 
-                            Let's use the Header 'isSearching' toggle to just filter locally or show a placeholder.
-                            For now: disabling visual search bar input to avoid crash, but logic is ready.
-                        */}
-                        <Text style={{ textAlign: 'center', color: '#999' }}>Search Mode Active</Text>
-                    </View>
-                )}
                 <FlatList
                     ref={flatListRef}
                     data={[...messages].reverse()}
@@ -462,11 +470,10 @@ export default function ChatScreen() {
                                         [
                                             { text: 'Reply', onPress: () => setReplyTo(item) },
                                             {
-                                                text: item['is_starred'] ? 'Unstar' : 'Star',
+                                                text: item.is_starred ? 'Unstar' : 'Star',
                                                 onPress: async () => {
                                                     await api.post(`/messages/${item.id}/star`);
-                                                    // Optimistic update
-                                                    setMessages(prev => prev.map(m => m.id === item.id ? { ...m, is_starred: !m['is_starred'] } : m));
+                                                    setMessages(prev => prev.map(m => m.id === item.id ? { ...m, is_starred: !m.is_starred } : m));
                                                 }
                                             },
                                             { text: 'Cancel', style: 'cancel' }
@@ -477,20 +484,31 @@ export default function ChatScreen() {
                             >
                                 <View style={[
                                     styles.messageItem,
-                                    isMyMessage ? styles.myMessage : styles.otherMessage
+                                    isMyMessage ? styles.myMessage : styles.otherMessage,
+                                    highlightedMessageId === item.id && { backgroundColor: isMyMessage ? '#0066CC' : '#FFFACD' }
                                 ]}>
-                                    {/* @ts-ignore - Parent field might not be in Type yet but API sends it */}
                                     {item.parent && (
-                                        <View style={{ borderLeftWidth: 2, borderLeftColor: isMyMessage ? '#fff' : '#007AFF', paddingLeft: 8, marginBottom: 4, opacity: 0.7 }}>
-                                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: isMyMessage ? '#fff' : '#333' }}>Replying to</Text>
-                                            <Text numberOfLines={1} style={{ fontSize: 12, color: isMyMessage ? '#fff' : '#333' }}>{item.parent.content || 'Attachment'}</Text>
-                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                const reversedData = [...messages].reverse();
+                                                const parentIndex = reversedData.findIndex(m => m.id === item.parent_id);
+                                                if (parentIndex !== -1) {
+                                                    flatListRef.current?.scrollToIndex({ index: parentIndex, animated: true });
+                                                    setHighlightedMessageId(item.parent_id!);
+                                                    setTimeout(() => setHighlightedMessageId(null), 2000);
+                                                }
+                                            }}
+                                            style={{ borderLeftWidth: 3, borderLeftColor: isMyMessage ? '#fff' : '#007AFF', paddingLeft: 8, marginBottom: 6, opacity: 0.85 }}
+                                        >
+                                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: isMyMessage ? '#fff' : '#333' }}>Replying to</Text>
+                                            <Text numberOfLines={1} style={{ fontSize: 13, color: isMyMessage ? '#fff' : '#555' }}>{stripHtml(item.parent.content) || 'Attachment'}</Text>
+                                        </TouchableOpacity>
                                     )}
 
                                     {renderMessageContent(item, isMyMessage)}
 
                                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4 }}>
-                                        {item['is_starred'] && <Ionicons name="star" size={10} color="#FFD700" style={{ marginRight: 4 }} />}
+                                        {item.is_starred && <Ionicons name="star" size={12} color="#FFD700" style={{ marginRight: 4 }} />}
                                         <Text style={[
                                             styles.messageDate,
                                             isMyMessage && { color: 'rgba(255,255,255,0.7)' }
@@ -499,9 +517,9 @@ export default function ChatScreen() {
                                         </Text>
                                         {isMyMessage && (
                                             <Ionicons
-                                                name={item['read_at'] ? "checkmark-done" : "checkmark"}
-                                                size={14}
-                                                color={item['read_at'] ? "#81b0ff" : "rgba(255,255,255,0.7)"}
+                                                name={item.read_at ? "checkmark-done" : "checkmark"}
+                                                size={16}
+                                                color={item.read_at ? "#81b0ff" : "rgba(255,255,255,0.7)"}
                                                 style={{ marginLeft: 4 }}
                                             />
                                         )}
@@ -520,14 +538,14 @@ export default function ChatScreen() {
                     <View style={styles.previewContainer}>
                         <View style={[styles.previewContent, { borderLeftWidth: 3, borderLeftColor: '#007AFF', paddingLeft: 8 }]}>
                             <View>
-                                <Text style={{ color: '#007AFF', fontWeight: 'bold', fontSize: 12 }}>Replying to</Text>
-                                <Text style={styles.previewText} numberOfLines={1}>
-                                    {replyTo.content || 'Attachment'}
+                                <Text style={{ color: '#007AFF', fontWeight: 'bold', fontSize: 13 }}>Replying to</Text>
+                                <Text style={[styles.previewText, { fontSize: 14 }]} numberOfLines={1}>
+                                    {stripHtml(replyTo.content) || 'Attachment'}
                                 </Text>
                             </View>
                         </View>
                         <TouchableOpacity onPress={() => setReplyTo(null)}>
-                            <Ionicons name="close-circle" size={22} color="#999" />
+                            <Ionicons name="close-circle" size={24} color="#999" />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -600,10 +618,10 @@ export default function ChatScreen() {
                             ref={richText}
                             onChange={setMessageContent}
                             placeholder="Type a message..."
-                            initialHeight={45}
+                            initialHeight={50}
                             editorStyle={{
                                 backgroundColor: '#F5F5F5',
-                                contentCSSText: 'font-size: 15px; padding: 8px 12px; min-height: 45px;',
+                                contentCSSText: 'font-size: 16px; padding: 10px 14px; min-height: 50px; line-height: 24px;',
                                 placeholderColor: '#999',
                             }}
                             style={styles.richEditor}
@@ -692,12 +710,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#F5F5F5',
         borderRadius: 20,
         overflow: 'hidden',
-        maxHeight: 100,
+        maxHeight: 150,
     },
     richEditor: {
         flex: 1,
-        minHeight: 45,
-        maxHeight: 100,
+        minHeight: 50,
+        maxHeight: 150,
     },
     sendButton: {
         backgroundColor: '#007AFF',

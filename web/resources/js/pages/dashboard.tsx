@@ -9,7 +9,7 @@ import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckChe
 axios.defaults.withCredentials = true;
 
 export default function Dashboard({ clients = [] }: { clients?: any[] }) {
-    const user = usePage().props.auth.user;
+    const user = (usePage().props as any).auth.user;
     const [selectedClient, setSelectedClient] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
@@ -20,12 +20,35 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [replyTo, setReplyTo] = useState<any>(null);
     const [messageSearch, setMessageSearch] = useState('');
     const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+    const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+    const [clientsData, setClientsData] = useState<any[]>(clients);
 
+    // Helper to strip HTML tags for plain text preview
+    const stripHtml = (html: string | null) => {
+        if (!html) return '';
+        return html.replace(/<[^>]+>/g, '').trim();
+    };
 
-    const filteredClients = clients.filter(client =>
+    // Poll for client list updates (for unread badges)
+    useEffect(() => {
+        const fetchClients = async () => {
+            try {
+                const endpoint = user.role === 'accountant' ? '/api/clients' : '/api/accountants';
+                const response = await axios.get(endpoint);
+                setClientsData(response.data);
+            } catch (error) {
+                console.error(error);
+            }
+        };
+        const interval = setInterval(fetchClients, 10000);
+        return () => clearInterval(interval);
+    }, [user.role]);
+
+    const filteredClients = clientsData.filter(client =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         client.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -234,14 +257,28 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
+                            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
                                 {messages.map(msg => (
-                                    <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`p-3 rounded-lg max-w-lg ${msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-700'}`}>
+                                    <div
+                                        key={msg.id}
+                                        id={`msg-${msg.id}`}
+                                        className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} transition-all duration-500 ${highlightedMessageId === msg.id ? 'scale-[1.02]' : ''}`}
+                                    >
+                                        <div className={`p-3 rounded-lg max-w-lg transition-colors duration-500 ${msg.sender_id === user.id ? (highlightedMessageId === msg.id ? 'bg-blue-600' : 'bg-blue-500') + ' text-white' : (highlightedMessageId === msg.id ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-gray-100 dark:bg-zinc-700')}`}>
                                             {msg.parent && (
-                                                <div className={`text-xs mb-2 p-1 rounded border-l-2 ${msg.sender_id === user.id ? 'bg-blue-600 border-blue-300 text-blue-100' : 'bg-gray-200 dark:bg-zinc-600 border-gray-400 text-gray-500 dark:text-gray-300'}`}>
+                                                <div
+                                                    onClick={() => {
+                                                        const parentEl = document.getElementById(`msg-${msg.parent.id}`);
+                                                        if (parentEl) {
+                                                            parentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                            setHighlightedMessageId(msg.parent.id);
+                                                            setTimeout(() => setHighlightedMessageId(null), 2000);
+                                                        }
+                                                    }}
+                                                    className={`text-xs mb-2 p-1.5 rounded border-l-2 cursor-pointer hover:opacity-90 ${msg.sender_id === user.id ? 'bg-blue-600 border-blue-300 text-blue-100' : 'bg-gray-200 dark:bg-zinc-600 border-gray-400 text-gray-500 dark:text-gray-300'}`}
+                                                >
                                                     <div className="font-bold flex items-center gap-1"><Reply className="h-3 w-3" /> Reply</div>
-                                                    <div className="truncate opacity-75">{msg.parent.content?.substring(0, 50) || 'Attachment'}</div>
+                                                    <div className="truncate opacity-75">{stripHtml(msg.parent.content)?.substring(0, 50) || 'Attachment'}</div>
                                                 </div>
                                             )}
                                             {(msg.type === 'text' || !msg.type) && (
@@ -310,7 +347,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     <div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-zinc-900 border-l-4 border-blue-500 rounded text-sm">
                                         <div className="flex flex-col">
                                             <span className="font-bold text-blue-600">Replying to message</span>
-                                            <span className="text-gray-500 truncate max-w-xs">{replyTo.content?.substring(0, 50) || 'Attachment'}</span>
+                                            <span className="text-gray-500 truncate max-w-xs">{stripHtml(replyTo.content)?.substring(0, 50) || 'Attachment'}</span>
                                         </div>
                                         <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-red-500">
                                             <X className="h-4 w-4" />
