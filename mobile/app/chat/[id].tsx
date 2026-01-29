@@ -374,7 +374,10 @@ export default function ChatScreen() {
         const textColor = isMyMessage ? '#fff' : '#333';
         const baseUrl = 'http://119.148.16.204:88';
 
-        const getUrl = (path: string) => path.startsWith('http') ? path : `${baseUrl}${path}`;
+        const getUrl = (path: string) => {
+            if (!path) return '';
+            return path.startsWith('http') ? path : `${baseUrl}${path}`;
+        };
 
         // Default to 'text' if type is undefined (for old messages)
         const messageType = item.type || 'text';
@@ -385,57 +388,67 @@ export default function ChatScreen() {
             ul: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
             ol: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
             li: { marginBottom: 2 },
-            b: { fontWeight: 'bold' as 'bold' }, // Cast to satisfy TS if needed, or just string
+            b: { fontWeight: 'bold' as 'bold' },
             strong: { fontWeight: 'bold' as 'bold' },
             i: { fontStyle: 'italic' as 'italic' },
             em: { fontStyle: 'italic' as 'italic' },
             u: { textDecorationLine: 'underline' as 'underline' },
         };
 
-        if (messageType === 'text' || !item.attachment_path) {
-            // Show content as text (includes old messages without type)
-            return (
-                <RenderHtml
-                    contentWidth={width * 0.7}
-                    source={{ html: item.content || '<p></p>' }}
-                    tagsStyles={baseTagsStyles}
-                    systemFonts={['System', 'Roboto', 'Arial']} // Ensure fonts are available
-                />
-            );
-        } else if (item.type === 'image' && item.attachment_path) {
-            return (
-                <View>
-                    <Image
-                        source={{ uri: getUrl(item.attachment_path) }}
-                        style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 5 }}
-                        resizeMode="cover"
+        // Fallback for valid content width
+        const contentWidth = (width * 0.7) > 0 ? (width * 0.7) : 200;
+
+        try {
+            if (messageType === 'text' || !item.attachment_path) {
+                // Show content as text (includes old messages without type)
+                const safeHtml = String(item.content || '').trim() || '<p></p>';
+                return (
+                    <RenderHtml
+                        contentWidth={contentWidth}
+                        source={{ html: safeHtml }}
+                        tagsStyles={baseTagsStyles}
+                        systemFonts={['System', 'Roboto', 'Arial', 'sans-serif']}
+                        defaultTextProps={{ allowFontScaling: true }}
                     />
-                    {item.content && (
-                        <RenderHtml
-                            contentWidth={width * 0.7}
-                            source={{ html: item.content }}
-                            tagsStyles={baseTagsStyles}
-                            systemFonts={['System', 'Roboto', 'Arial']}
+                );
+            } else if (item.type === 'image' && item.attachment_path) {
+                return (
+                    <View>
+                        <Image
+                            source={{ uri: getUrl(item.attachment_path) }}
+                            style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 5, backgroundColor: '#eee' }}
+                            resizeMode="cover"
                         />
-                    )}
-                </View>
-            );
-        } else if (item.type === 'audio' && item.attachment_path) {
-            return (
-                <TouchableOpacity onPress={() => playAudio(getUrl(item.attachment_path!))} style={styles.audioButton}>
-                    <Ionicons name="play-circle" size={32} color={textColor} />
-                    <Text style={{ color: textColor, marginLeft: 8, fontWeight: '500' }}>Voice Message</Text>
-                </TouchableOpacity>
-            );
-        } else if (item.type === 'file' && item.attachment_path) {
-            return (
-                <TouchableOpacity onPress={() => Linking.openURL(getUrl(item.attachment_path!))} style={styles.fileButton}>
-                    <Ionicons name="document-attach" size={24} color={textColor} />
-                    <Text style={{ color: textColor, marginLeft: 8, textDecorationLine: 'underline' }}>
-                        {decodeURIComponent(item.attachment_path!.split('/').pop() || 'Download File')}
-                    </Text>
-                </TouchableOpacity>
-            );
+                        {item.content ? (
+                            <RenderHtml
+                                contentWidth={contentWidth}
+                                source={{ html: String(item.content) }}
+                                tagsStyles={baseTagsStyles}
+                                systemFonts={['System', 'Roboto', 'Arial', 'sans-serif']}
+                            />
+                        ) : null}
+                    </View>
+                );
+            } else if (item.type === 'audio' && item.attachment_path) {
+                return (
+                    <TouchableOpacity onPress={() => playAudio(getUrl(item.attachment_path!))} style={styles.audioButton}>
+                        <Ionicons name="play-circle" size={32} color={textColor} />
+                        <Text style={{ color: textColor, marginLeft: 8, fontWeight: '500' }}>Voice Message</Text>
+                    </TouchableOpacity>
+                );
+            } else if (item.type === 'file' && item.attachment_path) {
+                return (
+                    <TouchableOpacity onPress={() => Linking.openURL(getUrl(item.attachment_path!))} style={styles.fileButton}>
+                        <Ionicons name="document-attach" size={24} color={textColor} />
+                        <Text style={{ color: textColor, marginLeft: 8, textDecorationLine: 'underline' }}>
+                            {decodeURIComponent(item.attachment_path!.split('/').pop() || 'Download File')}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            }
+        } catch (e) {
+            console.error('Render error:', e);
+            return <Text style={{ color: 'red', fontSize: 10 }}>Error rendering message</Text>;
         }
         return null;
     };
@@ -443,6 +456,17 @@ export default function ChatScreen() {
     const headerHeight = useHeaderHeight();
     const [showJumpToLatest, setShowJumpToLatest] = useState(false);
     const prevMessageCount = useRef(0);
+
+    // Safely format time
+    const formatTime = (dateStr: string) => {
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (e) {
+            return '';
+        }
+    };
 
     // Smart scroll: only scroll to bottom on new messages, not when browsing history
     useEffect(() => {
@@ -538,7 +562,7 @@ export default function ChatScreen() {
                 <FlatList
                     ref={flatListRef}
                     data={[...messages].reverse()}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
                     contentContainerStyle={styles.messagesList}
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"
@@ -573,7 +597,7 @@ export default function ChatScreen() {
                                 <View style={[
                                     styles.messageItem,
                                     isMyMessage ? styles.myMessage : styles.otherMessage,
-                                    highlightedMessageId === item.id && { backgroundColor: isMyMessage ? '#0066CC' : '#FFFACD' }
+                                    (highlightedMessageId === item.id) && { backgroundColor: isMyMessage ? '#0066CC' : '#FFFACD' }
                                 ]}>
                                     {item.parent && (
                                         <TouchableOpacity
@@ -589,7 +613,9 @@ export default function ChatScreen() {
                                             style={{ borderLeftWidth: 3, borderLeftColor: isMyMessage ? '#fff' : '#007AFF', paddingLeft: 8, marginBottom: 6, opacity: 0.85 }}
                                         >
                                             <Text style={{ fontSize: 11, fontWeight: 'bold', color: isMyMessage ? '#fff' : '#333' }}>Replying to</Text>
-                                            <Text numberOfLines={1} style={{ fontSize: 13, color: isMyMessage ? '#fff' : '#555' }}>{stripHtml(item.parent.content) || 'Attachment'}</Text>
+                                            <Text numberOfLines={1} style={{ fontSize: 13, color: isMyMessage ? '#fff' : '#555' }}>
+                                                {stripHtml(item.parent.content) || 'Attachment'}
+                                            </Text>
                                         </TouchableOpacity>
                                     )}
 
@@ -601,7 +627,7 @@ export default function ChatScreen() {
                                             styles.messageDate,
                                             isMyMessage && { color: 'rgba(255,255,255,0.7)' }
                                         ]}>
-                                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {formatTime(item.created_at)}
                                         </Text>
                                         {isMyMessage && (
                                             <Ionicons

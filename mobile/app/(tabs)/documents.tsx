@@ -15,23 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
+// Removed axios import
+import api from '../../services/api';
 
-const API_BASE_URL = 'http://192.168.0.105:8000/api';
+// Local api configuration removed in favor of shared service
 
-const api = axios.create({
-    baseURL: API_BASE_URL,
-    headers: { 'Accept': 'application/json' },
-});
-
-// Add auth token to requests
-api.interceptors.request.use(async (config) => {
-    const token = await SecureStore.getItemAsync('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
 
 interface Document {
     id: number;
