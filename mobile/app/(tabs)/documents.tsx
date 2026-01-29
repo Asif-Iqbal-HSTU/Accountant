@@ -16,7 +16,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import { Camera } from 'expo-camera';
 
 const API_BASE_URL = 'http://192.168.0.105:8000/api';
 
@@ -138,7 +137,7 @@ export default function DocumentsScreen() {
     };
 
     const pickFromCamera = async () => {
-        const { status } = await Camera.requestCameraPermissionsAsync();
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission needed', 'Camera permission is required to take photos');
             return;
