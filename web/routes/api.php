@@ -32,4 +32,16 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         return response()->json($user);
     });
+
+    // Document Management Routes
+    Route::get('/documents', [\App\Http\Controllers\Api\DocumentController::class, 'index']); // List own documents
+    Route::get('/documents/user/{userId}', [\App\Http\Controllers\Api\DocumentController::class, 'index']); // List user's documents (accountant)
+    Route::get('/documents/stats', [\App\Http\Controllers\Api\DocumentController::class, 'stats']); // Own stats
+    Route::get('/documents/stats/{userId}', [\App\Http\Controllers\Api\DocumentController::class, 'stats']); // User's stats (accountant)
+    Route::get('/documents/{id}', [\App\Http\Controllers\Api\DocumentController::class, 'show']);
+    Route::post('/documents', [\App\Http\Controllers\Api\DocumentController::class, 'store']); // Upload (supports bulk)
+    Route::put('/documents/{id}', [\App\Http\Controllers\Api\DocumentController::class, 'update']);
+    Route::delete('/documents/{id}', [\App\Http\Controllers\Api\DocumentController::class, 'destroy']);
+    Route::post('/documents/{id}/status', [\App\Http\Controllers\Api\DocumentController::class, 'updateStatus']);
+    Route::post('/documents/{id}/resubmit', [\App\Http\Controllers\Api\DocumentController::class, 'requestResubmission']);
 });

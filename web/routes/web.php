@@ -20,4 +20,14 @@ Route::get('dashboard', function () {
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+Route::get('documents', function () {
+    $clients = [];
+    if (auth()->user()->role === 'accountant') {
+        $clients = \App\Models\User::where('role', 'client')->get();
+    }
+    return Inertia::render('documents', [
+        'clients' => $clients
+    ]);
+})->middleware(['auth', 'verified'])->name('documents');
+
 require __DIR__ . '/settings.php';
