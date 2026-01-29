@@ -111,48 +111,6 @@ export default function ChatScreen() {
     // Set navigation title and Search
     useEffect(() => {
         navigation.setOptions({
-            headerTitle: isSearching ? () => (
-                <View style={{ width: width * 0.7 }}>
-                    {/* @ts-ignore */}
-                    <RichEditor
-                        placeholder="Search..."
-                        onChange={(text: string) => { // Type explicitly
-                            setSearchQuery(text);
-                            // Debounce or trigger search could go here
-                        }}
-                    // This is a hack because we don't have a TextInput imported easily that matches header style
-                    // But actually, we should just use standard TextInput
-                    />
-                </View> // Wait, RichEditor is weird for header. Let's use simple Text for title or standard TextInput.
-            ) : chatPartnerName,
-            headerRight: () => (
-                <TouchableOpacity onPress={() => {
-                    setIsSearching(!isSearching);
-                    if (isSearching) {
-                        setSearchQuery('');
-                        fetchMessages(); // Reset
-                    }
-                }} style={{ marginRight: 16 }}>
-                    <Ionicons name={isSearching ? "close" : "search"} size={24} color="#007AFF" />
-                </TouchableOpacity>
-            ),
-        });
-
-        // Fix for header title component, better to just change title string if not searching
-        if (isSearching) {
-            navigation.setOptions({
-                headerTitle: undefined,
-                headerTitleAlign: 'left',
-                // Custom header view is harder with Expo Router stack without a component.
-                // Let's keep it simple: Toggle a search view above messages?
-            });
-        }
-    }, [chatPartnerName, navigation, isSearching]);
-
-    // Re-implementing Search UI properly:
-    // We will render a search bar ABOVE the flatlist if isSearching is true.
-    useEffect(() => {
-        navigation.setOptions({
             headerTitle: chatPartnerName,
             headerRight: () => (
                 <TouchableOpacity onPress={() => setIsSearching(!isSearching)} style={{ marginRight: 16 }}>
@@ -408,14 +366,28 @@ export default function ChatScreen() {
     };
 
     const headerHeight = useHeaderHeight();
+    const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+    const prevMessageCount = useRef(0);
 
+    // Smart scroll: only scroll to bottom on new messages, not when browsing history
     useEffect(() => {
-        if (messages.length > 0) {
-            // For inverted list, offset 0 is the bottom (newest items)
-            // If we wanted to force scroll to bottom on new message:
+        if (messages.length > prevMessageCount.current) {
+            // New message arrived
             flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
         }
+        prevMessageCount.current = messages.length;
     }, [messages]);
+
+    const handleScroll = (event: any) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
+        // For inverted list, offsetY > threshold means user scrolled up (viewing old messages)
+        setShowJumpToLatest(offsetY > 200);
+    };
+
+    const jumpToLatest = () => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        setShowJumpToLatest(false);
+    };
 
     return (
         <KeyboardAvoidingView
@@ -458,6 +430,8 @@ export default function ChatScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                     inverted
+                    onScroll={handleScroll}
+                    scrollEventThrottle={100}
                     renderItem={({ item }) => {
                         const isMyMessage = item.sender_id === currentUser?.id;
 
@@ -529,6 +503,30 @@ export default function ChatScreen() {
                         );
                     }}
                 />
+                {showJumpToLatest && (
+                    <TouchableOpacity
+                        onPress={jumpToLatest}
+                        style={{
+                            position: 'absolute',
+                            bottom: 20,
+                            alignSelf: 'center',
+                            backgroundColor: '#007AFF',
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 4,
+                            elevation: 5,
+                        }}
+                    >
+                        <Ionicons name="arrow-down" size={16} color="#fff" />
+                        <Text style={{ color: '#fff', marginLeft: 6, fontWeight: '600' }}>Jump to Latest</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Input Section at BOTTOM */}

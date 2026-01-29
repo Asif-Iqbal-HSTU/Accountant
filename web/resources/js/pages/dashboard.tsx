@@ -61,13 +61,28 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
         }
     }, [selectedClient]);
 
+    const prevMessageCount = useRef(0);
+    const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+    // Smart scroll: only scroll on new messages, not when browsing history
     useEffect(() => {
-        // Auto-scroll to bottom when messages change
-        scrollToBottom();
+        if (messages.length > prevMessageCount.current) {
+            // New message arrived
+            scrollToBottom();
+        }
+        prevMessageCount.current = messages.length;
     }, [messages]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        setShowJumpToLatest(false);
+    };
+
+    const handleChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const element = e.currentTarget;
+        const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+        // Show button if user scrolled more than 300px from bottom
+        setShowJumpToLatest(distanceFromBottom > 300);
     };
 
     const fetchMessages = async () => {
@@ -257,7 +272,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
                                 </div>
                             </div>
-                            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
+                            <div ref={messagesContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto space-y-4 mb-4 p-2 relative">
                                 {messages.map(msg => (
                                     <div
                                         key={msg.id}
@@ -327,6 +342,15 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     </div>
                                 ))}
                                 <div ref={messagesEndRef} />
+                                {showJumpToLatest && (
+                                    <button
+                                        onClick={scrollToBottom}
+                                        className="sticky bottom-4 left-1/2 -translate-x-1/2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
+                                    >
+                                        <ArrowDown className="h-4 w-4" />
+                                        Jump to Latest
+                                    </button>
+                                )}
                             </div>
 
                             {/* Attachments Preview */}
