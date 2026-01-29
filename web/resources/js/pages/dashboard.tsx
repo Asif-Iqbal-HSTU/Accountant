@@ -1,10 +1,10 @@
 import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
-import { useState, useEffect, useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2 } from 'lucide-react';
+import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
+import { Paperclip, Mic, Square, Trash2, ArrowDown } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
 
@@ -19,6 +19,9 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+
 
     const filteredClients = clients.filter(client =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -33,10 +36,21 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
         }
     }, [selectedClient]);
 
+    useEffect(() => {
+        // Auto-scroll to bottom when messages change
+        scrollToBottom();
+    }, [messages]);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
     const fetchMessages = async () => {
         if (!selectedClient) return;
         try {
             const response = await axios.get(`/api/messages/${selectedClient.id}`);
+            // Check if we have new messages compared to current state to show indicator if we wanted to be conditional
+            // For now, per requirement, just update and scroll
             setMessages(response.data);
         } catch (error) {
             console.error(error);
@@ -204,6 +218,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         </div>
                                     </div>
                                 ))}
+                                <div ref={messagesEndRef} />
                             </div>
 
                             {/* Attachments Preview */}
@@ -225,14 +240,16 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         <Editor
                                             value={newMessage}
                                             onChange={onEditorChange}
-                                            containerProps={{ style: { height: '100px', borderRadius: '0.5rem' } }}
+                                            containerProps={{ style: { height: '160px', borderRadius: '0.5rem' } }}
                                         >
                                             <Toolbar>
                                                 <BtnBold />
                                                 <BtnItalic />
                                                 <BtnUnderline />
                                                 <BtnStrikeThrough />
+                                                <Separator />
                                                 <BtnLink />
+                                                <Separator />
                                                 <BtnBulletList />
                                                 <BtnNumberedList />
                                                 <BtnClearFormatting />

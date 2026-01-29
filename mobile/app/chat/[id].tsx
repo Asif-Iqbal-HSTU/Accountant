@@ -4,6 +4,7 @@ import {
     Text,
     FlatList,
     StyleSheet,
+    KeyboardAvoidingView,
     Platform,
     useWindowDimensions,
     TouchableOpacity,
@@ -14,6 +15,7 @@ import {
     ScrollView
 } from 'react-native';
 
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import RenderHtml from 'react-native-render-html';
@@ -324,8 +326,22 @@ export default function ChatScreen() {
         return null;
     };
 
+    const headerHeight = useHeaderHeight();
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            // For inverted list, offset 0 is the bottom (newest items)
+            // If we wanted to force scroll to bottom on new message:
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }
+    }, [messages]);
+
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+        >
             {/* Messages List */}
             <FlatList
                 ref={flatListRef}
@@ -386,13 +402,17 @@ export default function ChatScreen() {
                         actions.setBold,
                         actions.setItalic,
                         actions.setUnderline,
+                        actions.insertLink,
+                        actions.insertBulletsList,
+                        actions.insertOrderedList,
                         actions.insertBulletsList,
                         actions.insertOrderedList,
                     ]}
                     iconMap={{
-                        [actions.setBold]: () => <Text style={styles.toolbarIcon}>B</Text>,
-                        [actions.setItalic]: () => <Text style={[styles.toolbarIcon, { fontStyle: 'italic' }]}>I</Text>,
-                        [actions.setUnderline]: () => <Text style={[styles.toolbarIcon, { textDecorationLine: 'underline' }]}>U</Text>,
+                        [actions.setBold]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor }]}>B</Text>,
+                        [actions.setItalic]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor, fontStyle: 'italic' }]}>I</Text>,
+                        [actions.setUnderline]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor, textDecorationLine: 'underline' }]}>U</Text>,
+                        [actions.insertLink]: ({ tintColor }: any) => <Ionicons name="link" size={20} color={tintColor} />,
                     }}
                     style={styles.toolbar}
                 />
@@ -445,7 +465,7 @@ export default function ChatScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
