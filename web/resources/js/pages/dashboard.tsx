@@ -174,10 +174,10 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                 {messages.map(msg => (
                                     <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`p-3 rounded-lg max-w-lg ${msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-700'}`}>
-                                            {msg.type === 'text' && (
+                                            {(msg.type === 'text' || !msg.type) && (
                                                 <div
                                                     className="prose dark:prose-invert max-w-none text-sm rich-text-content"
-                                                    dangerouslySetInnerHTML={{ __html: msg.content }}
+                                                    dangerouslySetInnerHTML={{ __html: msg.content || '' }}
                                                 />
                                             )}
                                             {msg.type === 'image' && (
