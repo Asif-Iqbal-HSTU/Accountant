@@ -17,6 +17,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'index']);
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
+    Route::post('/messages/{id}/read', [\App\Http\Controllers\Api\MessageController::class, 'markAsRead']);
+    Route::post('/messages/read-all/{senderId}', [\App\Http\Controllers\Api\MessageController::class, 'markAllRead']);
+    Route::post('/messages/{id}/star', [\App\Http\Controllers\Api\MessageController::class, 'toggleStar']);
+    Route::post('/messages/archive/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'archiveConversation']);
 
     // Fetch user info for chat header
     Route::get('/users/{id}', function ($id) {

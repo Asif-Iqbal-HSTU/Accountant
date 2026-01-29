@@ -157,6 +157,11 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id, name: item.name } })}
             >
               <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+              {item.unread_count > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.unread_count}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -325,6 +330,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 4,
   },
 });
 

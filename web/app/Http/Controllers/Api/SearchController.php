@@ -10,7 +10,11 @@ class SearchController extends Controller
 {
     public function searchAccountants(Request $request)
     {
-        $query = User::where('role', 'accountant');
+        $query = User::where('role', 'accountant')
+            ->withCount(['sentMessages as unread_count' => function ($q) {
+                $q->where('receiver_id', \Illuminate\Support\Facades\Auth::id())
+                  ->whereNull('read_at');
+            }]);
 
         if ($request->has('q')) {
             $query->where('name', 'like', '%' . $request->q . '%');
@@ -21,7 +25,11 @@ class SearchController extends Controller
 
     public function searchClients(Request $request)
     {
-        $query = User::where('role', 'client');
+        $query = User::where('role', 'client')
+            ->withCount(['sentMessages as unread_count' => function ($q) {
+                $q->where('receiver_id', \Illuminate\Support\Facades\Auth::id())
+                  ->whereNull('read_at');
+            }]);
 
         if ($request->has('q')) {
             $query->where('name', 'like', '%' . $request->q . '%');

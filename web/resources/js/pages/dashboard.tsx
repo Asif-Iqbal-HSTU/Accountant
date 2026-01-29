@@ -4,7 +4,7 @@ import { dashboard } from '@/routes';
 import { useRef, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2, ArrowDown } from 'lucide-react';
+import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
 
@@ -20,6 +20,8 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [replyTo, setReplyTo] = useState<any>(null);
+    const [messageSearch, setMessageSearch] = useState('');
     const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
 
 
@@ -48,10 +50,30 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const fetchMessages = async () => {
         if (!selectedClient) return;
         try {
-            const response = await axios.get(`/api/messages/${selectedClient.id}`);
-            // Check if we have new messages compared to current state to show indicator if we wanted to be conditional
-            // For now, per requirement, just update and scroll
+            const url = messageSearch ? `/api/messages/${selectedClient.id}?q=${messageSearch}` : `/api/messages/${selectedClient.id}`;
+            const response = await axios.get(url);
             setMessages(response.data);
+
+            // Mark unread messages as read
+            const unreadIds = response.data
+                .filter((m: any) => m.receiver_id === user.id && !m.read_at)
+                .map((m: any) => m.id);
+
+            if (unreadIds.length > 0) {
+                // We could do bulk read, but for now loop or just call "read-all" if simple
+                await axios.post(`/api/messages/read-all/${selectedClient.id}`);
+            }
+
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const toggleStar = async (msgId: number) => {
+        try {
+            await axios.post(`/api/messages/${msgId}/star`);
+            // Optimistic update
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_starred: !m.is_starred } : m));
         } catch (error) {
             console.error(error);
         }
@@ -123,6 +145,10 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
             formData.append('attachment', audioBlob, 'voice-message.webm');
         }
 
+        if (replyTo) {
+            formData.append('parent_id', replyTo.id);
+        }
+
         try {
             await axios.post('/api/messages', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -130,6 +156,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
             setNewMessage('');
             setAttachment(null);
             setAudioBlob(null);
+            setReplyTo(null);
             fetchMessages();
         } catch (error) {
             console.error(error);
@@ -168,8 +195,17 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     onClick={() => setSelectedClient(client)}
                                     className={`p-3 rounded cursor-pointer transition-colors ${selectedClient?.id === client.id ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
                                 >
-                                    <div className="font-bold">{client.name}</div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">{client.email}</div>
+                                    <div className="flex justify-between items-center w-full">
+                                        <div>
+                                            <div className="font-bold">{client.name}</div>
+                                            <div className="text-sm text-gray-500 dark:text-gray-400">{client.email}</div>
+                                        </div>
+                                        {client.unread_count > 0 && (
+                                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">
+                                                {client.unread_count}
+                                            </span>
+                                        )}
+                                    </div>
                                 </li>
                             ))}
                             {clients.length === 0 && <p className="text-gray-500">No clients found.</p>}
@@ -181,13 +217,33 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                 <div className="flex-1 bg-white dark:bg-zinc-800 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border shadow-sm p-4 flex flex-col">
                     {selectedClient ? (
                         <>
-                            <div className="border-b dark:border-zinc-700 pb-2 mb-4">
+                            <div className="border-b dark:border-zinc-700 pb-2 mb-4 flex justify-between items-center">
                                 <h2 className="text-xl font-bold">Chat with {selectedClient.name}</h2>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search chat..."
+                                        value={messageSearch}
+                                        onChange={(e) => {
+                                            setMessageSearch(e.target.value);
+                                            // Trigger fetch immediately or debounced logic could go here
+                                        }}
+                                        onKeyDown={(e) => e.key === 'Enter' && fetchMessages()}
+                                        className="pl-8 pr-2 py-1 text-sm border rounded-full dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+                                    />
+                                    <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
+                                </div>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
                                 {messages.map(msg => (
                                     <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`p-3 rounded-lg max-w-lg ${msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-700'}`}>
+                                            {msg.parent && (
+                                                <div className={`text-xs mb-2 p-1 rounded border-l-2 ${msg.sender_id === user.id ? 'bg-blue-600 border-blue-300 text-blue-100' : 'bg-gray-200 dark:bg-zinc-600 border-gray-400 text-gray-500 dark:text-gray-300'}`}>
+                                                    <div className="font-bold flex items-center gap-1"><Reply className="h-3 w-3" /> Reply</div>
+                                                    <div className="truncate opacity-75">{msg.parent.content?.substring(0, 50) || 'Attachment'}</div>
+                                                </div>
+                                            )}
                                             {(msg.type === 'text' || !msg.type) && (
                                                 <div
                                                     className="prose dark:prose-invert max-w-none text-sm rich-text-content"
@@ -206,15 +262,30 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                                 </div>
                                             )}
                                             {msg.type === 'file' && (
-                                                <a href={msg.attachment_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 underline">
-                                                    <Paperclip className="h-4 w-4" />
-                                                    Download Attachment
+                                                <a href={msg.attachment_path} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 underline break-all ${msg.sender_id === user.id ? 'text-blue-100' : 'text-blue-600'}`}>
+                                                    <Paperclip className="h-4 w-4 shrink-0" />
+                                                    {decodeURIComponent(msg.attachment_path.split('/').pop() || 'Download File')}
                                                 </a>
                                             )}
 
-                                            <span className={`text-[10px] block mt-1 ${msg.sender_id === user.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                {new Date(msg.created_at).toLocaleTimeString()}
-                                            </span>
+                                            <div className="flex justify-between items-end mt-1">
+                                                <span className={`text-[10px] ${msg.sender_id === user.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                <div className="flex items-center gap-2 ml-2">
+                                                    <button onClick={() => toggleStar(msg.id)} title={msg.is_starred ? "Unstar" : "Star"}>
+                                                        <Star className={`h-3 w-3 ${msg.is_starred ? 'fill-yellow-400 text-yellow-400' : (msg.sender_id === user.id ? 'text-blue-200' : 'text-gray-400')}`} />
+                                                    </button>
+                                                    <button onClick={() => setReplyTo(msg)} title="Reply">
+                                                        <Reply className={`h-3 w-3 ${msg.sender_id === user.id ? 'text-blue-200' : 'text-gray-400'}`} />
+                                                    </button>
+                                                    {msg.sender_id === user.id && (
+                                                        <span>
+                                                            {msg.read_at ? <CheckCheck className="h-3 w-3 text-blue-200" /> : <Check className="h-3 w-3 text-blue-200" />}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -235,6 +306,17 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                             )}
 
                             <div className="flex flex-col gap-2">
+                                {replyTo && (
+                                    <div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-zinc-900 border-l-4 border-blue-500 rounded text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-blue-600">Replying to message</span>
+                                            <span className="text-gray-500 truncate max-w-xs">{replyTo.content?.substring(0, 50) || 'Attachment'}</span>
+                                        </div>
+                                        <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-red-500">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700 text-black dark:text-black">
                                     <EditorProvider>
                                         <Editor

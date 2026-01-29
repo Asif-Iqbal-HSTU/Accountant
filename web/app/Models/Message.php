@@ -6,7 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
-    protected $fillable = ['sender_id', 'receiver_id', 'content', 'type', 'attachment_path'];
+    protected $fillable = [
+        'sender_id', 'receiver_id', 'content', 'type', 'attachment_path',
+        'parent_id', 'read_at', 'is_starred', 'is_archived'
+    ];
+
+    public function parent()
+    {
+        return $this->belongsTo(Message::class, 'parent_id');
+    }
 
     public function sender()
     {
