@@ -1,16 +1,12 @@
 import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
-import { useState, useEffect } from 'react';
-
-// Use the globally configured axios instance (typically set up in bootstrap.ts/js)
-// If typescript complains, we can cast or just use window.axios if configured.
-// For now, let's stick to import but ensure we're not missing config.
-// actually, if we use window.axios it is better for Sanctum SPA.
-// Let's use standard import but usually we need 'withCredentials'.
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-axios.defaults.withCredentials = true; // Ensure cookies are sent
+import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting } from 'react-simple-wysiwyg';
+import { Paperclip, Mic, Square, Trash2 } from 'lucide-react';
 
+axios.defaults.withCredentials = true;
 
 export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const user = usePage().props.auth.user;
@@ -18,6 +14,11 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [attachment, setAttachment] = useState<File | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const filteredClients = clients.filter(client =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,21 +43,88 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
         }
     };
 
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            const chunks: BlobPart[] = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                setAudioBlob(blob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            alert("Could not access microphone.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setAttachment(e.target.files[0]);
+            setAudioBlob(null); // Clear audio if file selected
+        }
+    };
+
     const sendMessage = async (e: any) => {
         e.preventDefault();
-        if (!newMessage || !selectedClient) return;
+
+        let type = 'text';
+        if (audioBlob) type = 'audio';
+        else if (attachment) type = 'file'; // or image, check mime later
+
+        if (attachment && attachment.type.startsWith('image/')) type = 'image';
+
+        const stripped = newMessage.replace(/<[^>]+>/g, '').trim();
+
+        // Validation: Must have content OR attachment OR audio
+        if (!stripped && !newMessage.includes('<img') && !attachment && !audioBlob) return;
+
+        if (!selectedClient) return;
+
+        const formData = new FormData();
+        formData.append('receiver_id', selectedClient.id);
+        formData.append('content', newMessage);
+        formData.append('type', type);
+
+        if (attachment) {
+            formData.append('attachment', attachment);
+        } else if (audioBlob) {
+            formData.append('attachment', audioBlob, 'voice-message.webm');
+        }
 
         try {
-            await axios.post('/api/messages', {
-                receiver_id: selectedClient.id,
-                content: newMessage
+            await axios.post('/api/messages', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
             setNewMessage('');
+            setAttachment(null);
+            setAudioBlob(null);
             fetchMessages();
         } catch (error) {
             console.error(error);
         }
     };
+
+    function onEditorChange(e: any) {
+        setNewMessage(e.target.value);
+    }
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Dashboard', href: dashboard().url }]}>
@@ -105,8 +173,31 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                             <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
                                 {messages.map(msg => (
                                     <div key={msg.id} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`p-3 rounded-lg max-w-xs ${msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-700'}`}>
-                                            <p>{msg.content}</p>
+                                        <div className={`p-3 rounded-lg max-w-lg ${msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-700'}`}>
+                                            {msg.type === 'text' && (
+                                                <div
+                                                    className="prose dark:prose-invert max-w-none text-sm rich-text-content"
+                                                    dangerouslySetInnerHTML={{ __html: msg.content }}
+                                                />
+                                            )}
+                                            {msg.type === 'image' && (
+                                                <div className="mb-2">
+                                                    <img src={msg.attachment_path} alt="Attachment" className="max-w-full rounded-lg" />
+                                                    {msg.content && <div dangerouslySetInnerHTML={{ __html: msg.content }} className="text-sm mt-1" />}
+                                                </div>
+                                            )}
+                                            {msg.type === 'audio' && (
+                                                <div className="flex items-center gap-2">
+                                                    <audio controls src={msg.attachment_path} className="h-8 w-48" />
+                                                </div>
+                                            )}
+                                            {msg.type === 'file' && (
+                                                <a href={msg.attachment_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 underline">
+                                                    <Paperclip className="h-4 w-4" />
+                                                    Download Attachment
+                                                </a>
+                                            )}
+
                                             <span className={`text-[10px] block mt-1 ${msg.sender_id === user.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                                                 {new Date(msg.created_at).toLocaleTimeString()}
                                             </span>
@@ -114,16 +205,81 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     </div>
                                 ))}
                             </div>
-                            <form onSubmit={sendMessage} className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newMessage}
-                                    onChange={e => setNewMessage(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-1 p-2 border rounded-lg dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Send</button>
-                            </form>
+
+                            {/* Attachments Preview */}
+                            {(attachment || audioBlob) && (
+                                <div className="p-2 mb-2 bg-gray-100 dark:bg-zinc-900 rounded-lg flex items-center justify-between">
+                                    <div className="text-sm">
+                                        {attachment && <span>Attached: {attachment.name}</span>}
+                                        {audioBlob && <span>Audio Recording Ready</span>}
+                                    </div>
+                                    <button onClick={() => { setAttachment(null); setAudioBlob(null); }} className="text-red-500 hover:text-red-700">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-2">
+                                <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700 text-black dark:text-black">
+                                    <EditorProvider>
+                                        <Editor
+                                            value={newMessage}
+                                            onChange={onEditorChange}
+                                            containerProps={{ style: { height: '100px', borderRadius: '0.5rem' } }}
+                                        >
+                                            <Toolbar>
+                                                <BtnBold />
+                                                <BtnItalic />
+                                                <BtnUnderline />
+                                                <BtnStrikeThrough />
+                                                <BtnLink />
+                                                <BtnBulletList />
+                                                <BtnNumberedList />
+                                                <BtnClearFormatting />
+                                            </Toolbar>
+                                        </Editor>
+                                    </EditorProvider>
+                                </div>
+
+                                <div className="flex justify-between items-center">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            onChange={handleFileSelect}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-300"
+                                            title="Attach File"
+                                        >
+                                            <Paperclip className="h-5 w-5" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-600 dark:text-gray-300'}`}
+                                            title={isRecording ? "Stop Recording" : "Record Audio"}
+                                        >
+                                            {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                                        </button>
+                                    </div>
+
+                                    <button
+                                        onClick={sendMessage}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+                            </div>
+                            <style>{`
+                                .rich-text-content p { margin: 0; }
+                                .rich-text-content a { text-decoration: underline; color: inherit; }
+                            `}</style>
                         </>
                     ) : (
                         <div className="flex items-center justify-center h-full text-gray-400">

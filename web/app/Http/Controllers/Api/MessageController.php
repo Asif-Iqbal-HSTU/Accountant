@@ -28,13 +28,22 @@ class MessageController extends Controller
     {
         $request->validate([
             'receiver_id' => 'required|exists:users,id',
-            'content' => 'required|string',
+            'content' => 'nullable|string',
+            'attachment' => 'nullable|file|max:10240', // 10MB max
+            'type' => 'required|in:text,image,file,audio',
         ]);
+
+        $path = null;
+        if ($request->hasFile('attachment')) {
+            $path = $request->file('attachment')->store('attachments', 'public');
+        }
 
         $message = Message::create([
             'sender_id' => Auth::id(),
             'receiver_id' => $request->receiver_id,
             'content' => $request->content,
+            'type' => $request->type,
+            'attachment_path' => $path ? '/storage/' . $path : null,
         ]);
 
         return response()->json($message);

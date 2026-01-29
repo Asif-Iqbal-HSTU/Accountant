@@ -17,4 +17,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'index']);
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
+
+    // Fetch user info for chat header
+    Route::get('/users/{id}', function ($id) {
+        $user = \App\Models\User::select('id', 'name', 'email')->find($id);
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        return response()->json($user);
+    });
 });

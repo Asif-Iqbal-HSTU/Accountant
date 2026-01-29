@@ -4,6 +4,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import { initializeTheme } from './hooks/use-appearance';
+import axios from 'axios';
+
+axios.defaults.withCredentials = true;
+axios.defaults.withXSRFToken = true;
+
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

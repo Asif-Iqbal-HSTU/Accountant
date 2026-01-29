@@ -10,6 +10,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  validateStatus: (status) => status >= 200 && status < 300, // Reject redirects (which often mean auth failure -> HTML login page)
 });
 
 api.interceptors.request.use(async (config) => {
