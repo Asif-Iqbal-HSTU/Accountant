@@ -27,9 +27,15 @@ class MessageController extends Controller
             $query->where('content', 'like', '%' . $request->q . '%');
         }
 
+        // Date range filtering
+        if ($request->has('date_from') && !empty($request->date_from)) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->has('date_to') && !empty($request->date_to)) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
         // Archive logic: By default, hide archived messages unless specifically requested
-        // Note: Archiving usually hides the whole conversation, but if we want per-message archiving or just to hide the conv from list.
-        // For simplicity, let's assume 'is_archived' flag on message hides it.
         if ($request->has('archived') && $request->archived == 'true') {
             $query->where('is_archived', true);
         } else {
@@ -120,5 +126,25 @@ class MessageController extends Controller
         })->update(['is_archived' => true]);
 
         return response()->json(['message' => 'Conversation archived']);
+    }
+
+    /**
+     * Set typing status (stored in cache for 5 seconds)
+     */
+    public function setTyping(Request $request, $receiverId)
+    {
+        $cacheKey = 'typing_' . Auth::id() . '_' . $receiverId;
+        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->addSeconds(5));
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Check if partner is typing
+     */
+    public function getTyping($partnerId)
+    {
+        $cacheKey = 'typing_' . $partnerId . '_' . Auth::id();
+        $isTyping = \Illuminate\Support\Facades\Cache::get($cacheKey, false);
+        return response()->json(['is_typing' => $isTyping]);
     }
 }

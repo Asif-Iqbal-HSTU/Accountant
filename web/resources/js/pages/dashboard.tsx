@@ -4,7 +4,7 @@ import { dashboard } from '@/routes';
 import { useRef, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X } from 'lucide-react';
+import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, MoreVertical } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
 
@@ -26,6 +26,12 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
     const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
     const [clientsData, setClientsData] = useState<any[]>(clients);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [showDateFilter, setShowDateFilter] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const [partnerTyping, setPartnerTyping] = useState(false);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Helper to strip HTML tags for plain text preview
     const stripHtml = (html: string | null) => {
@@ -81,30 +87,89 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const handleChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const element = e.currentTarget;
         const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-        // Show button if user scrolled more than 300px from bottom
         setShowJumpToLatest(distanceFromBottom > 300);
     };
 
     const fetchMessages = async () => {
         if (!selectedClient) return;
         try {
-            const url = messageSearch ? `/api/messages/${selectedClient.id}?q=${messageSearch}` : `/api/messages/${selectedClient.id}`;
+            let url = `/api/messages/${selectedClient.id}`;
+            const params = new URLSearchParams();
+            if (messageSearch) params.append('q', messageSearch);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (params.toString()) url += '?' + params.toString();
+
             const response = await axios.get(url);
             setMessages(response.data);
 
-            // Mark unread messages as read
             const unreadIds = response.data
                 .filter((m: any) => m.receiver_id === user.id && !m.read_at)
                 .map((m: any) => m.id);
 
             if (unreadIds.length > 0) {
-                // We could do bulk read, but for now loop or just call "read-all" if simple
                 await axios.post(`/api/messages/read-all/${selectedClient.id}`);
             }
 
         } catch (error) {
             console.error(error);
         }
+    };
+
+    // Typing indicator functions
+    const sendTypingStatus = async () => {
+        if (!selectedClient) return;
+        try {
+            await axios.post(`/api/messages/typing/${selectedClient.id}`);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const pollTypingStatus = async () => {
+        if (!selectedClient) return;
+        try {
+            const response = await axios.get(`/api/messages/typing/${selectedClient.id}`);
+            setPartnerTyping(response.data.is_typing);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    // Poll for typing status
+    useEffect(() => {
+        if (selectedClient) {
+            const interval = setInterval(pollTypingStatus, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [selectedClient]);
+
+    // Archive conversation
+    const archiveConversation = async () => {
+        if (!selectedClient) return;
+        if (!confirm('Are you sure you want to archive this conversation? It will be hidden from both users.')) return;
+        try {
+            await axios.post(`/api/messages/archive/${selectedClient.id}`);
+            setMessages([]);
+            setSelectedClient(null);
+            alert('Conversation archived successfully.');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to archive conversation.');
+        }
+    };
+
+    // Handler for editor changes - triggers typing indicator
+    const onEditorChange = (e: any) => {
+        setNewMessage(e.target.value);
+        // Debounce typing indicator
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        sendTypingStatus();
+        typingTimeoutRef.current = setTimeout(() => {
+            // Typing stopped
+        }, 3000);
     };
 
     const toggleStar = async (msgId: number) => {
@@ -201,9 +266,6 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
         }
     };
 
-    function onEditorChange(e: any) {
-        setNewMessage(e.target.value);
-    }
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Dashboard', href: dashboard().url }]}>
@@ -255,22 +317,78 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                 <div className="flex-1 bg-white dark:bg-zinc-800 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border shadow-sm p-4 flex flex-col">
                     {selectedClient ? (
                         <>
-                            <div className="border-b dark:border-zinc-700 pb-2 mb-4 flex justify-between items-center">
-                                <h2 className="text-xl font-bold">Chat with {selectedClient.name}</h2>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="Search chat..."
-                                        value={messageSearch}
-                                        onChange={(e) => {
-                                            setMessageSearch(e.target.value);
-                                            // Trigger fetch immediately or debounced logic could go here
-                                        }}
-                                        onKeyDown={(e) => e.key === 'Enter' && fetchMessages()}
-                                        className="pl-8 pr-2 py-1 text-sm border rounded-full dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
-                                    />
-                                    <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
+                            <div className="border-b dark:border-zinc-700 pb-2 mb-2">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h2 className="text-xl font-bold">Chat with {selectedClient.name}</h2>
+                                        {partnerTyping && (
+                                            <p className="text-sm text-green-500 italic animate-pulse">
+                                                {selectedClient.name} is typing...
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="Search chat..."
+                                                value={messageSearch}
+                                                onChange={(e) => setMessageSearch(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && fetchMessages()}
+                                                className="pl-8 pr-2 py-1 text-sm border rounded-full dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+                                            />
+                                            <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
+                                        </div>
+                                        <button
+                                            onClick={() => setShowDateFilter(!showDateFilter)}
+                                            className={`p-1.5 rounded-full ${showDateFilter ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-zinc-700'}`}
+                                            title="Filter by date"
+                                        >
+                                            <Filter className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={archiveConversation}
+                                            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-500 hover:text-red-500"
+                                            title="Archive conversation"
+                                        >
+                                            <Archive className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
+                                {showDateFilter && (
+                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t dark:border-zinc-700">
+                                        <Calendar className="h-4 w-4 text-gray-400" />
+                                        <input
+                                            type="date"
+                                            value={dateFrom}
+                                            onChange={(e) => setDateFrom(e.target.value)}
+                                            className="text-sm border rounded px-2 py-1 dark:bg-zinc-900 dark:border-zinc-700"
+                                            placeholder="From"
+                                        />
+                                        <span className="text-gray-400">to</span>
+                                        <input
+                                            type="date"
+                                            value={dateTo}
+                                            onChange={(e) => setDateTo(e.target.value)}
+                                            className="text-sm border rounded px-2 py-1 dark:bg-zinc-900 dark:border-zinc-700"
+                                            placeholder="To"
+                                        />
+                                        <button
+                                            onClick={fetchMessages}
+                                            className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                                        >
+                                            Apply
+                                        </button>
+                                        {(dateFrom || dateTo) && (
+                                            <button
+                                                onClick={() => { setDateFrom(''); setDateTo(''); fetchMessages(); }}
+                                                className="text-sm text-gray-500 hover:text-red-500"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div ref={messagesContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto space-y-4 mb-4 p-2 relative">
                                 {messages.map(msg => (

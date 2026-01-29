@@ -68,6 +68,11 @@ export default function ChatScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [showDateFilter, setShowDateFilter] = useState(false);
+    const [partnerTyping, setPartnerTyping] = useState(false);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Helper to strip HTML tags for plain text preview
     const stripHtml = (html: string | null) => {
@@ -111,14 +116,29 @@ export default function ChatScreen() {
     // Set navigation title and Search
     useEffect(() => {
         navigation.setOptions({
-            headerTitle: chatPartnerName,
+            headerTitle: () => (
+                <View>
+                    <Text style={{ fontSize: 17, fontWeight: '600' }}>{chatPartnerName}</Text>
+                    {partnerTyping && (
+                        <Text style={{ fontSize: 12, color: '#22c55e', fontStyle: 'italic' }}>typing...</Text>
+                    )}
+                </View>
+            ),
             headerRight: () => (
-                <TouchableOpacity onPress={() => setIsSearching(!isSearching)} style={{ marginRight: 16 }}>
-                    <Ionicons name={isSearching ? "close" : "search"} size={24} color="#007AFF" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 8 }}>
+                    <TouchableOpacity onPress={() => setIsSearching(!isSearching)}>
+                        <Ionicons name={isSearching ? "close" : "search"} size={22} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowDateFilter(!showDateFilter)}>
+                        <Ionicons name="calendar-outline" size={22} color={showDateFilter ? "#007AFF" : "#666"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={archiveConversation}>
+                        <Ionicons name="archive-outline" size={22} color="#666" />
+                    </TouchableOpacity>
+                </View>
             ),
         });
-    }, [chatPartnerName, navigation, isSearching]);
+    }, [chatPartnerName, navigation, isSearching, showDateFilter, partnerTyping]);
 
     const getCurrentUser = async () => {
         const userStr = await SecureStore.getItemAsync('user');
@@ -139,12 +159,17 @@ export default function ChatScreen() {
 
     const fetchMessages = async () => {
         try {
-            const url = searchQuery ? `/messages/${id}?q=${searchQuery}` : `/messages/${id}`;
+            let url = `/messages/${id}`;
+            const params = new URLSearchParams();
+            if (searchQuery) params.append('q', searchQuery);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (params.toString()) url += '?' + params.toString();
+
             const response = await api.get(url);
             if (Array.isArray(response.data)) {
                 setMessages(response.data);
 
-                // Mark unread
                 const unreadIds = response.data
                     .filter((m: any) => m.receiver_id === currentUser?.id && !m.read_at)
                     .map((m: any) => m.id);
@@ -160,6 +185,56 @@ export default function ChatScreen() {
             console.log("Error fetching messages:", error);
         }
     };
+
+    // Typing indicator functions
+    const sendTypingStatus = async () => {
+        try {
+            await api.post(`/messages/typing/${id}`);
+        } catch (error) {
+            console.log("Error sending typing status:", error);
+        }
+    };
+
+    const pollTypingStatus = async () => {
+        try {
+            const response = await api.get(`/messages/typing/${id}`);
+            setPartnerTyping(response.data.is_typing);
+        } catch (error) {
+            console.log("Error polling typing status:", error);
+        }
+    };
+
+    // Poll for typing status
+    useEffect(() => {
+        const interval = setInterval(pollTypingStatus, 2000);
+        return () => clearInterval(interval);
+    }, [id]);
+
+    // Archive conversation
+    const archiveConversation = async () => {
+        Alert.alert(
+            'Archive Conversation',
+            'Are you sure you want to archive this conversation? It will be hidden from both users.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Archive',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await api.post(`/messages/archive/${id}`);
+                            Alert.alert('Success', 'Conversation archived.');
+                            navigation.goBack();
+                        } catch (error) {
+                            console.log("Error archiving:", error);
+                            Alert.alert('Error', 'Failed to archive conversation.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
 
     const pickDocument = async () => {
         try {
@@ -419,6 +494,45 @@ export default function ChatScreen() {
                     </View>
                 </View>
             )}
+            {/* Date Filter UI */}
+            {showDateFilter && (
+                <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="calendar" size={18} color="#666" />
+                        <TextInput
+                            style={{ flex: 1, backgroundColor: '#fff', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#ddd' }}
+                            placeholder="From (YYYY-MM-DD)"
+                            placeholderTextColor="#999"
+                            value={dateFrom}
+                            onChangeText={setDateFrom}
+                        />
+                        <Text style={{ color: '#666' }}>to</Text>
+                        <TextInput
+                            style={{ flex: 1, backgroundColor: '#fff', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#ddd' }}
+                            placeholder="To (YYYY-MM-DD)"
+                            placeholderTextColor="#999"
+                            value={dateTo}
+                            onChangeText={setDateTo}
+                        />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                        {(dateFrom || dateTo) && (
+                            <TouchableOpacity
+                                onPress={() => { setDateFrom(''); setDateTo(''); fetchMessages(); }}
+                                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, backgroundColor: '#eee' }}
+                            >
+                                <Text style={{ color: '#666' }}>Clear</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            onPress={fetchMessages}
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, backgroundColor: '#007AFF' }}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: '600' }}>Apply</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
             {/* Messages List */}
             <View style={{ flex: 1 }}>
                 <FlatList
@@ -614,7 +728,15 @@ export default function ChatScreen() {
                     <View style={styles.editorContainer}>
                         <RichEditor
                             ref={richText}
-                            onChange={setMessageContent}
+                            onChange={(text) => {
+                                setMessageContent(text);
+                                // Trigger typing indicator
+                                if (typingTimeoutRef.current) {
+                                    clearTimeout(typingTimeoutRef.current);
+                                }
+                                sendTypingStatus();
+                                typingTimeoutRef.current = setTimeout(() => { }, 3000);
+                            }}
                             placeholder="Type a message..."
                             initialHeight={50}
                             editorStyle={{
