@@ -265,6 +265,7 @@ class DocumentController extends Controller
             'pending' => Document::where('user_id', $targetUserId)->where('status', 'pending')->count(),
             'reviewed' => Document::where('user_id', $targetUserId)->where('status', 'reviewed')->count(),
             'processed' => Document::where('user_id', $targetUserId)->where('status', 'processed')->count(),
+            'approved' => Document::where('user_id', $targetUserId)->where('status', 'processed')->count(), // Alias for mobile app
             'by_category' => Document::where('user_id', $targetUserId)
                 ->selectRaw('category, count(*) as count')
                 ->groupBy('category')

@@ -10,6 +10,12 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
+Route::get('setup', function () {
+    return Inertia::render('setup/accountant');
+})->name('setup');
+
+Route::post('setup', [\App\Http\Controllers\SetupController::class, 'setupAccountant'])->name('setup.submit');
+
 Route::get('dashboard', function () {
     $clients = [];
     if (auth()->user()->role === 'accountant') {
@@ -29,5 +35,9 @@ Route::get('documents', function () {
         'clients' => $clients
     ]);
 })->middleware(['auth', 'verified'])->name('documents');
+
+Route::get('meetings', function () {
+    return Inertia::render('meetings/index');
+})->middleware(['auth', 'verified'])->name('meetings');
 
 require __DIR__ . '/settings.php';

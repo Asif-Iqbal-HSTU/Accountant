@@ -372,7 +372,7 @@ export default function ChatScreen() {
 
     const renderMessageContent = (item: Message, isMyMessage: boolean) => {
         const textColor = isMyMessage ? '#fff' : '#333';
-        const baseUrl = 'http://119.148.16.204:88';
+        const baseUrl = 'http://103.7.193.2:91';
 
         const getUrl = (path: string) => {
             if (!path) return '';

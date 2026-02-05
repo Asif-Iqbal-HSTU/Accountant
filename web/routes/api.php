@@ -3,8 +3,13 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Legacy auth routes (kept for compatibility)
 Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
 Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+
+// New setup routes (no password required)
+Route::post('/setup/profile', [\App\Http\Controllers\Api\SetupController::class, 'setupProfile']);
+Route::post('/setup/check-email', [\App\Http\Controllers\Api\SetupController::class, 'checkEmail']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
@@ -44,4 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/documents/{id}', [\App\Http\Controllers\Api\DocumentController::class, 'destroy']);
     Route::post('/documents/{id}/status', [\App\Http\Controllers\Api\DocumentController::class, 'updateStatus']);
     Route::post('/documents/{id}/resubmit', [\App\Http\Controllers\Api\DocumentController::class, 'requestResubmission']);
+
+    // Meeting Routes
+    Route::apiResource('meetings', \App\Http\Controllers\Api\MeetingController::class);
 });

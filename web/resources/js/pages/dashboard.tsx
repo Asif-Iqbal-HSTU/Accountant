@@ -4,7 +4,7 @@ import { dashboard } from '@/routes';
 import { useRef, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, MoreVertical } from 'lucide-react';
+import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, Send, MessageSquare, Users, Building2 } from 'lucide-react';
 
 axios.defaults.withCredentials = true;
 
@@ -32,11 +32,37 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const [isTyping, setIsTyping] = useState(false);
     const [partnerTyping, setPartnerTyping] = useState(false);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
     // Helper to strip HTML tags for plain text preview
     const stripHtml = (html: string | null) => {
         if (!html) return '';
         return html.replace(/<[^>]+>/g, '').trim();
+    };
+
+    // Get initials from name
+    const getInitials = (name: string) => {
+        const words = name.split(' ');
+        if (words.length >= 2) {
+            return (words[0][0] + words[1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    };
+
+    // Get avatar gradient colors
+    const getAvatarClasses = (name: string) => {
+        const gradients = [
+            'from-blue-500 to-teal-400',
+            'from-purple-500 to-pink-400',
+            'from-amber-500 to-red-400',
+            'from-emerald-500 to-cyan-400',
+            'from-indigo-500 to-purple-400',
+        ];
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return gradients[Math.abs(hash) % gradients.length];
     };
 
     // Poll for client list updates (for unread badges)
@@ -68,12 +94,10 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     }, [selectedClient]);
 
     const prevMessageCount = useRef(0);
-    const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
     // Smart scroll: only scroll on new messages, not when browsing history
     useEffect(() => {
         if (messages.length > prevMessageCount.current) {
-            // New message arrived
             scrollToBottom();
         }
         prevMessageCount.current = messages.length;
@@ -162,20 +186,16 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     // Handler for editor changes - triggers typing indicator
     const onEditorChange = (e: any) => {
         setNewMessage(e.target.value);
-        // Debounce typing indicator
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
         sendTypingStatus();
-        typingTimeoutRef.current = setTimeout(() => {
-            // Typing stopped
-        }, 3000);
+        typingTimeoutRef.current = setTimeout(() => { }, 3000);
     };
 
     const toggleStar = async (msgId: number) => {
         try {
             await axios.post(`/api/messages/${msgId}/star`);
-            // Optimistic update
             setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_starred: !m.is_starred } : m));
         } catch (error) {
             console.error(error);
@@ -217,7 +237,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachment(e.target.files[0]);
-            setAudioBlob(null); // Clear audio if file selected
+            setAudioBlob(null);
         }
     };
 
@@ -226,13 +246,12 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
 
         let type = 'text';
         if (audioBlob) type = 'audio';
-        else if (attachment) type = 'file'; // or image, check mime later
+        else if (attachment) type = 'file';
 
         if (attachment && attachment.type.startsWith('image/')) type = 'image';
 
         const stripped = newMessage.replace(/<[^>]+>/g, '').trim();
 
-        // Validation: Must have content OR attachment OR audio
         if (!stripped && !newMessage.includes('<img') && !attachment && !audioBlob) return;
 
         if (!selectedClient) return;
@@ -270,85 +289,141 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Dashboard', href: dashboard().url }]}>
             <Head title="Dashboard" />
-            <div className="flex h-[calc(100vh-65px)] p-4 gap-4">
+            <div className="flex h-[calc(100vh-65px)] p-4 gap-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
                 {/* Client List */}
-                <div className="w-1/3 bg-white dark:bg-zinc-800 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border shadow-sm p-4 overflow-y-auto">
-                    <h2 className="text-xl font-bold mb-4">Clients</h2>
+                <div className="w-80 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl">
+                    {/* Header */}
+                    <div className="p-5 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-500/5 to-teal-500/5">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                                <Users className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Clients</h2>
+                                <p className="text-xs text-slate-500">{filteredClients.length} total</p>
+                            </div>
+                        </div>
 
-                    {user.role === 'accountant' && (
-                        <input
-                            type="text"
-                            placeholder="Search clients..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-2 mb-4 border rounded-lg dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    )}
+                        {user.role === 'accountant' && (
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search clients..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                                />
+                            </div>
+                        )}
+                    </div>
 
-                    {user.role === 'client' ? (
-                        <p>Search accountants on your mobile app.</p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {filteredClients.map(client => (
-                                <li
-                                    key={client.id}
-                                    onClick={() => setSelectedClient(client)}
-                                    className={`p-3 rounded cursor-pointer transition-colors ${selectedClient?.id === client.id ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
-                                >
-                                    <div className="flex justify-between items-center w-full">
-                                        <div>
-                                            <div className="font-bold">{client.name}</div>
-                                            <div className="text-sm text-gray-500 dark:text-gray-400">{client.email}</div>
+                    {/* Client List */}
+                    <div className="flex-1 overflow-y-auto p-3">
+                        {user.role === 'client' ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-teal-500/10 flex items-center justify-center mb-4">
+                                    <MessageSquare className="h-8 w-8 text-blue-500" />
+                                </div>
+                                <p className="text-slate-500 text-sm">Search accountants on your mobile app.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {filteredClients.map(client => (
+                                    <button
+                                        key={client.id}
+                                        onClick={() => setSelectedClient(client)}
+                                        className={`w-full p-3 rounded-xl transition-all duration-200 flex items-center gap-3 text-left group ${selectedClient?.id === client.id
+                                                ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg shadow-blue-500/25'
+                                                : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                                            }`}
+                                    >
+                                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm ${selectedClient?.id === client.id
+                                                ? 'bg-white/20'
+                                                : `bg-gradient-to-br ${getAvatarClasses(client.name)} text-white shadow-md`
+                                            }`}>
+                                            {getInitials(client.name)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className={`font-semibold truncate ${selectedClient?.id === client.id ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                                {client.name}
+                                            </div>
+                                            <div className={`text-xs truncate ${selectedClient?.id === client.id ? 'text-white/70' : 'text-slate-500'}`}>
+                                                {client.email}
+                                            </div>
                                         </div>
                                         {client.unread_count > 0 && (
-                                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">
+                                            <div className={`min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs font-bold ${selectedClient?.id === client.id
+                                                    ? 'bg-white text-blue-500'
+                                                    : 'bg-red-500 text-white'
+                                                }`}>
                                                 {client.unread_count}
-                                            </span>
+                                            </div>
                                         )}
+                                    </button>
+                                ))}
+                                {clients.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
+                                            <Users className="h-8 w-8 text-slate-400" />
+                                        </div>
+                                        <p className="text-slate-500 text-sm">No clients found.</p>
                                     </div>
-                                </li>
-                            ))}
-                            {clients.length === 0 && <p className="text-gray-500">No clients found.</p>}
-                        </ul>
-                    )}
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Chat Area */}
-                <div className="flex-1 bg-white dark:bg-zinc-800 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border shadow-sm p-4 flex flex-col">
+                <div className="flex-1 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl">
                     {selectedClient ? (
                         <>
-                            <div className="border-b dark:border-zinc-700 pb-2 mb-2">
+                            {/* Chat Header */}
+                            <div className="px-6 py-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-500/5 to-teal-500/5">
                                 <div className="flex justify-between items-center">
-                                    <div>
-                                        <h2 className="text-xl font-bold">Chat with {selectedClient.name}</h2>
-                                        {partnerTyping && (
-                                            <p className="text-sm text-green-500 italic animate-pulse">
-                                                {selectedClient.name} is typing...
-                                            </p>
-                                        )}
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getAvatarClasses(selectedClient.name)} flex items-center justify-center font-bold text-white shadow-lg`}>
+                                            {getInitials(selectedClient.name)}
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">{selectedClient.name}</h2>
+                                            {partnerTyping ? (
+                                                <p className="text-sm text-teal-500 font-medium flex items-center gap-1">
+                                                    <span className="flex gap-0.5">
+                                                        <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                                        <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                                        <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                                    </span>
+                                                    typing...
+                                                </p>
+                                            ) : (
+                                                <p className="text-sm text-slate-500">{selectedClient.email}</p>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <input
                                                 type="text"
                                                 placeholder="Search chat..."
                                                 value={messageSearch}
                                                 onChange={(e) => setMessageSearch(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && fetchMessages()}
-                                                className="pl-8 pr-2 py-1 text-sm border rounded-full dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+                                                className="pl-9 pr-4 py-2 text-sm bg-slate-100 dark:bg-slate-900/50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 w-48"
                                             />
-                                            <Search className="absolute left-2.5 top-1.5 h-4 w-4 text-gray-400" />
                                         </div>
                                         <button
                                             onClick={() => setShowDateFilter(!showDateFilter)}
-                                            className={`p-1.5 rounded-full ${showDateFilter ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-zinc-700'}`}
+                                            className={`p-2.5 rounded-xl transition-all ${showDateFilter ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
                                             title="Filter by date"
                                         >
                                             <Filter className="h-4 w-4" />
                                         </button>
                                         <button
                                             onClick={archiveConversation}
-                                            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-500 hover:text-red-500"
+                                            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-500/20 transition-all"
                                             title="Archive conversation"
                                         >
                                             <Archive className="h-4 w-4" />
@@ -356,33 +431,31 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     </div>
                                 </div>
                                 {showDateFilter && (
-                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t dark:border-zinc-700">
-                                        <Calendar className="h-4 w-4 text-gray-400" />
+                                    <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                        <Calendar className="h-4 w-4 text-slate-400" />
                                         <input
                                             type="date"
                                             value={dateFrom}
                                             onChange={(e) => setDateFrom(e.target.value)}
-                                            className="text-sm border rounded px-2 py-1 dark:bg-zinc-900 dark:border-zinc-700"
-                                            placeholder="From"
+                                            className="text-sm border rounded-lg px-3 py-2 dark:bg-slate-900 dark:border-slate-700"
                                         />
-                                        <span className="text-gray-400">to</span>
+                                        <span className="text-slate-400">to</span>
                                         <input
                                             type="date"
                                             value={dateTo}
                                             onChange={(e) => setDateTo(e.target.value)}
-                                            className="text-sm border rounded px-2 py-1 dark:bg-zinc-900 dark:border-zinc-700"
-                                            placeholder="To"
+                                            className="text-sm border rounded-lg px-3 py-2 dark:bg-slate-900 dark:border-slate-700"
                                         />
                                         <button
                                             onClick={fetchMessages}
-                                            className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                                            className="text-sm bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
                                         >
                                             Apply
                                         </button>
                                         {(dateFrom || dateTo) && (
                                             <button
                                                 onClick={() => { setDateFrom(''); setDateTo(''); fetchMessages(); }}
-                                                className="text-sm text-gray-500 hover:text-red-500"
+                                                className="text-sm text-slate-500 hover:text-red-500"
                                             >
                                                 Clear
                                             </button>
@@ -390,14 +463,19 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     </div>
                                 )}
                             </div>
-                            <div ref={messagesContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto space-y-4 mb-4 p-2 relative">
+
+                            {/* Messages */}
+                            <div ref={messagesContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-slate-50/50 to-white dark:from-slate-900/50 dark:to-slate-800/50">
                                 {messages.map(msg => (
                                     <div
                                         key={msg.id}
                                         id={`msg-${msg.id}`}
-                                        className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} transition-all duration-500 ${highlightedMessageId === msg.id ? 'scale-[1.02]' : ''}`}
+                                        className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} transition-all duration-300 ${highlightedMessageId === msg.id ? 'scale-[1.02]' : ''}`}
                                     >
-                                        <div className={`p-3 rounded-lg max-w-lg transition-colors duration-500 ${msg.sender_id === user.id ? (highlightedMessageId === msg.id ? 'bg-blue-600' : 'bg-blue-500') + ' text-white' : (highlightedMessageId === msg.id ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-gray-100 dark:bg-zinc-700')}`}>
+                                        <div className={`max-w-lg rounded-2xl p-4 transition-all duration-300 ${msg.sender_id === user.id
+                                                ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-br-md shadow-lg shadow-blue-500/20'
+                                                : 'bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white rounded-bl-md shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-700/50'
+                                            } ${highlightedMessageId === msg.id ? 'ring-2 ring-yellow-400' : ''}`}>
                                             {msg.parent && (
                                                 <div
                                                     onClick={() => {
@@ -408,22 +486,25 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                                             setTimeout(() => setHighlightedMessageId(null), 2000);
                                                         }
                                                     }}
-                                                    className={`text-xs mb-2 p-1.5 rounded border-l-2 cursor-pointer hover:opacity-90 ${msg.sender_id === user.id ? 'bg-blue-600 border-blue-300 text-blue-100' : 'bg-gray-200 dark:bg-zinc-600 border-gray-400 text-gray-500 dark:text-gray-300'}`}
+                                                    className={`text-xs mb-3 p-2 rounded-lg border-l-2 cursor-pointer transition-all hover:opacity-80 ${msg.sender_id === user.id
+                                                            ? 'bg-white/10 border-white/50'
+                                                            : 'bg-slate-100 dark:bg-slate-600/50 border-slate-300 dark:border-slate-500'
+                                                        }`}
                                                 >
-                                                    <div className="font-bold flex items-center gap-1"><Reply className="h-3 w-3" /> Reply</div>
-                                                    <div className="truncate opacity-75">{stripHtml(msg.parent.content)?.substring(0, 50) || 'Attachment'}</div>
+                                                    <div className="font-semibold flex items-center gap-1"><Reply className="h-3 w-3" /> Reply</div>
+                                                    <div className="truncate opacity-80">{stripHtml(msg.parent.content)?.substring(0, 50) || 'Attachment'}</div>
                                                 </div>
                                             )}
                                             {(msg.type === 'text' || !msg.type) && (
                                                 <div
-                                                    className="prose dark:prose-invert max-w-none text-sm rich-text-content"
+                                                    className="prose prose-sm dark:prose-invert max-w-none rich-text-content"
                                                     dangerouslySetInnerHTML={{ __html: msg.content || '' }}
                                                 />
                                             )}
                                             {msg.type === 'image' && (
                                                 <div className="mb-2">
                                                     <img src={msg.attachment_path} alt="Attachment" className="max-w-full rounded-lg" />
-                                                    {msg.content && <div dangerouslySetInnerHTML={{ __html: msg.content }} className="text-sm mt-1" />}
+                                                    {msg.content && <div dangerouslySetInnerHTML={{ __html: msg.content }} className="text-sm mt-2" />}
                                                 </div>
                                             )}
                                             {msg.type === 'audio' && (
@@ -432,26 +513,26 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                                 </div>
                                             )}
                                             {msg.type === 'file' && (
-                                                <a href={msg.attachment_path} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 underline break-all ${msg.sender_id === user.id ? 'text-blue-100' : 'text-blue-600'}`}>
+                                                <a href={msg.attachment_path} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 underline break-all ${msg.sender_id === user.id ? 'text-white/90' : 'text-blue-600 dark:text-blue-400'}`}>
                                                     <Paperclip className="h-4 w-4 shrink-0" />
                                                     {decodeURIComponent(msg.attachment_path.split('/').pop() || 'Download File')}
                                                 </a>
                                             )}
 
-                                            <div className="flex justify-between items-end mt-1">
-                                                <span className={`text-[10px] ${msg.sender_id === user.id ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                                            <div className="flex justify-between items-end mt-2 pt-2 border-t border-white/10 dark:border-slate-600/50">
+                                                <span className={`text-[10px] ${msg.sender_id === user.id ? 'text-white/70' : 'text-slate-400'}`}>
                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
-                                                <div className="flex items-center gap-2 ml-2">
-                                                    <button onClick={() => toggleStar(msg.id)} title={msg.is_starred ? "Unstar" : "Star"}>
-                                                        <Star className={`h-3 w-3 ${msg.is_starred ? 'fill-yellow-400 text-yellow-400' : (msg.sender_id === user.id ? 'text-blue-200' : 'text-gray-400')}`} />
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => toggleStar(msg.id)} title={msg.is_starred ? "Unstar" : "Star"} className="opacity-60 hover:opacity-100 transition-opacity">
+                                                        <Star className={`h-3.5 w-3.5 ${msg.is_starred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
                                                     </button>
-                                                    <button onClick={() => setReplyTo(msg)} title="Reply">
-                                                        <Reply className={`h-3 w-3 ${msg.sender_id === user.id ? 'text-blue-200' : 'text-gray-400'}`} />
+                                                    <button onClick={() => setReplyTo(msg)} title="Reply" className="opacity-60 hover:opacity-100 transition-opacity">
+                                                        <Reply className="h-3.5 w-3.5" />
                                                     </button>
                                                     {msg.sender_id === user.id && (
-                                                        <span>
-                                                            {msg.read_at ? <CheckCheck className="h-3 w-3 text-blue-200" /> : <Check className="h-3 w-3 text-blue-200" />}
+                                                        <span className="opacity-70">
+                                                            {msg.read_at ? <CheckCheck className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
                                                         </span>
                                                     )}
                                                 </div>
@@ -463,7 +544,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                 {showJumpToLatest && (
                                     <button
                                         onClick={scrollToBottom}
-                                        className="sticky bottom-4 left-1/2 -translate-x-1/2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
+                                        className="sticky bottom-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-500 to-teal-500 text-white px-5 py-2.5 rounded-full shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all hover:shadow-blue-500/40"
                                     >
                                         <ArrowDown className="h-4 w-4" />
                                         Jump to Latest
@@ -471,39 +552,42 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                 )}
                             </div>
 
-                            {/* Attachments Preview */}
-                            {(attachment || audioBlob) && (
-                                <div className="p-2 mb-2 bg-gray-100 dark:bg-zinc-900 rounded-lg flex items-center justify-between">
-                                    <div className="text-sm">
-                                        {attachment && <span>Attached: {attachment.name}</span>}
-                                        {audioBlob && <span>Audio Recording Ready</span>}
-                                    </div>
-                                    <button onClick={() => { setAttachment(null); setAudioBlob(null); }} className="text-red-500 hover:text-red-700">
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="flex flex-col gap-2">
-                                {replyTo && (
-                                    <div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-zinc-900 border-l-4 border-blue-500 rounded text-sm">
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-blue-600">Replying to message</span>
-                                            <span className="text-gray-500 truncate max-w-xs">{stripHtml(replyTo.content)?.substring(0, 50) || 'Attachment'}</span>
+                            {/* Input Area */}
+                            <div className="p-4 border-t border-slate-200/50 dark:border-slate-700/50 bg-white dark:bg-slate-800/50">
+                                {/* Attachments Preview */}
+                                {(attachment || audioBlob) && (
+                                    <div className="mb-3 p-3 bg-gradient-to-r from-blue-500/10 to-teal-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                            <Paperclip className="h-4 w-4 text-blue-500" />
+                                            {attachment && <span>{attachment.name}</span>}
+                                            {audioBlob && <span>Audio Recording Ready</span>}
                                         </div>
-                                        <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-red-500">
+                                        <button onClick={() => { setAttachment(null); setAudioBlob(null); }} className="text-red-500 hover:text-red-600 transition-colors">
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {replyTo && (
+                                    <div className="mb-3 flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-700/50 border-l-4 border-blue-500 rounded-lg text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold text-blue-600 dark:text-blue-400">Replying to message</span>
+                                            <span className="text-slate-500 truncate max-w-xs">{stripHtml(replyTo.content)?.substring(0, 50) || 'Attachment'}</span>
+                                        </div>
+                                        <button onClick={() => setReplyTo(null)} className="text-slate-500 hover:text-red-500 transition-colors">
                                             <X className="h-4 w-4" />
                                         </button>
                                     </div>
                                 )}
-                                <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-300 dark:border-zinc-700 text-black dark:text-black">
+
+                                <div className="bg-slate-100 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                                     <EditorProvider>
                                         <Editor
                                             value={newMessage}
                                             onChange={onEditorChange}
-                                            containerProps={{ style: { height: '160px', borderRadius: '0.5rem' } }}
+                                            containerProps={{ style: { minHeight: '100px', borderRadius: '0.5rem' } }}
                                         >
-                                            <Toolbar>
+                                            <Toolbar style={{ borderBottom: '1px solid rgba(0,0,0,0.1)', padding: '8px 12px' }}>
                                                 <BtnBold />
                                                 <BtnItalic />
                                                 <BtnUnderline />
@@ -519,7 +603,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                     </EditorProvider>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center mt-3">
                                     <div className="flex gap-2">
                                         <input
                                             type="file"
@@ -530,7 +614,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         <button
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-300"
+                                            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all"
                                             title="Attach File"
                                         >
                                             <Paperclip className="h-5 w-5" />
@@ -539,7 +623,7 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         <button
                                             type="button"
                                             onClick={isRecording ? stopRecording : startRecording}
-                                            className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-600 dark:text-gray-300'}`}
+                                            className={`p-2.5 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
                                             title={isRecording ? "Stop Recording" : "Record Audio"}
                                         >
                                             {isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
@@ -548,8 +632,9 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
 
                                     <button
                                         onClick={sendMessage}
-                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                                        className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center gap-2"
                                     >
+                                        <Send className="h-4 w-4" />
                                         Send
                                     </button>
                                 </div>
@@ -560,8 +645,12 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                             `}</style>
                         </>
                     ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
-                            Select a client to start chatting
+                        <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500/10 to-teal-500/10 flex items-center justify-center mb-6">
+                                <MessageSquare className="h-12 w-12 text-blue-500/50" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Select a conversation</h3>
+                            <p className="text-slate-500 max-w-sm">Choose a client from the list to start messaging and collaborating on their documents.</p>
                         </div>
                     )}
                 </div>

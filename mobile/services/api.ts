@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'http://119.148.16.204:88/api'; // Server Public IP
+const API_URL = 'http://103.7.193.2:91/api'; // Server Public IP
 // const API_URL = 'http://localhost:8123/api'; // iOS Simulator
 
 const api = axios.create({
