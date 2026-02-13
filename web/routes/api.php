@@ -52,4 +52,47 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Meeting Routes
     Route::apiResource('meetings', \App\Http\Controllers\Api\MeetingController::class);
+
+    // ─── Accounting Management Routes ───
+
+    // Company Info
+    Route::get('/company-info', [\App\Http\Controllers\Api\ClientCompanyInfoController::class, 'show']);
+    Route::get('/company-info/{userId}', [\App\Http\Controllers\Api\ClientCompanyInfoController::class, 'show']);
+    Route::post('/company-info', [\App\Http\Controllers\Api\ClientCompanyInfoController::class, 'store']);
+
+    // Payroll - Submissions
+    Route::get('/payroll/submissions', [\App\Http\Controllers\Api\PayrollController::class, 'getSubmissions']);
+    Route::post('/payroll/submissions', [\App\Http\Controllers\Api\PayrollController::class, 'submitHours']);
+
+    // Payroll - Payslips
+    Route::get('/payroll/payslips', [\App\Http\Controllers\Api\PayrollController::class, 'getPayslips']);
+    Route::post('/payroll/payslips', [\App\Http\Controllers\Api\PayrollController::class, 'uploadPayslip']);
+
+    // Payroll - Liabilities
+    Route::get('/payroll/liabilities', [\App\Http\Controllers\Api\PayrollController::class, 'getLiabilities']);
+    Route::post('/payroll/liabilities', [\App\Http\Controllers\Api\PayrollController::class, 'storeLiability']);
+
+    // Payroll - Starter Form
+    Route::get('/payroll/starter-form', [\App\Http\Controllers\Api\PayrollController::class, 'getStarterForm']);
+    Route::post('/payroll/starter-form', [\App\Http\Controllers\Api\PayrollController::class, 'uploadStarterForm']);
+
+    // Payroll - P60s and P45s
+    Route::get('/payroll/p60-p45', [\App\Http\Controllers\Api\PayrollController::class, 'getP60P45']);
+    Route::post('/payroll/p60-p45', [\App\Http\Controllers\Api\PayrollController::class, 'uploadP60P45']);
+
+    // Accounts
+    Route::get('/accounts', [\App\Http\Controllers\Api\AccountsController::class, 'index']);
+    Route::post('/accounts', [\App\Http\Controllers\Api\AccountsController::class, 'store']);
+
+    // Corporation Tax
+    Route::get('/corporation-tax', [\App\Http\Controllers\Api\CorporationTaxController::class, 'index']);
+    Route::post('/corporation-tax', [\App\Http\Controllers\Api\CorporationTaxController::class, 'store']);
+
+    // VAT
+    Route::get('/vat', [\App\Http\Controllers\Api\VatController::class, 'index']);
+    Route::post('/vat', [\App\Http\Controllers\Api\VatController::class, 'store']);
+
+    // Self Assessment
+    Route::get('/self-assessment', [\App\Http\Controllers\Api\SelfAssessmentController::class, 'index']);
+    Route::post('/self-assessment', [\App\Http\Controllers\Api\SelfAssessmentController::class, 'store']);
 });

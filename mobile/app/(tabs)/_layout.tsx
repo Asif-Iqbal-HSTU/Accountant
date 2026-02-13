@@ -68,11 +68,22 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="accounting"
+        options={{
+          title: 'Accounting',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? styles.activeIconContainer : undefined}>
+              <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={24} color={color} />
+            </View>
+          ),
+        }}
+      />
       {/* Hide explore tab */}
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // This hides the tab
+          href: null,
         }}
       />
     </Tabs>

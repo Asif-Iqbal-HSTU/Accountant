@@ -89,6 +89,11 @@ export default function ClientDashboard() {
   };
 
   const logout = async () => {
+    try {
+      await api.post('/logout');
+    } catch (e) {
+      // Ignore errors - we're logging out anyway
+    }
     await SecureStore.deleteItemAsync('token');
     await SecureStore.deleteItemAsync('user');
     router.replace('/setup');
