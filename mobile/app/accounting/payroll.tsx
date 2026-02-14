@@ -20,16 +20,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
 import api, { API_URL } from '../../services/api';
 
 const MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+const YEARS = ['2023/2024', '2024/2025', '2025/2026'];
 
 export default function PayrollScreen() {
     const [selectedYear, setSelectedYear] = useState('2024/2025');
     const [selectedMonth, setSelectedMonth] = useState(MONTHS[new Date().getMonth()]);
     const [loading, setLoading] = useState(false);
     const [submissions, setSubmissions] = useState<any[]>([]);
+    const [liability, setLiability] = useState<any>(null);
+    const [starterForm, setStarterForm] = useState<any>(null);
+    const [p60p45s, setP60p45s] = useState<any[]>([]);
 
     // Add Employee Modal
     const [showAddModal, setShowAddModal] = useState(false);
@@ -40,18 +46,33 @@ export default function PayrollScreen() {
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [pdfTitle, setPdfTitle] = useState('');
 
+    // Document List Modal (for P60/P45 if multiple)
+    const [showDocListModal, setShowDocListModal] = useState(false);
+
     useEffect(() => {
-        loadSubmissions();
+        loadData();
     }, [selectedYear, selectedMonth]);
 
-    const loadSubmissions = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            const response = await api.get(`/payroll/submissions?year=${selectedYear}&month=${selectedMonth}`);
-            setSubmissions(response.data);
+            const [subsRes, liabRes, starterRes, p60Res] = await Promise.all([
+                api.get(`/payroll/submissions?year=${selectedYear}&month=${selectedMonth}`),
+                api.get(`/payroll/liabilities?year=${selectedYear}`),
+                api.get('/payroll/starter-form'),
+                api.get('/payroll/p60-p45')
+            ]);
+
+            setSubmissions(subsRes.data || []);
+            setStarterForm(starterRes.data || null);
+            setP60p45s(Array.isArray(p60Res.data) ? p60Res.data : []);
+
+            // Filter liability for selected month
+            const currentMonthLiab = liabRes.data.find((l: any) => l.month === selectedMonth);
+            setLiability(currentMonthLiab || null);
         } catch (error) {
             console.log(error);
-            Alert.alert('Error', 'Failed to load employees');
+            Alert.alert('Error', 'Failed to load data');
         } finally {
             setLoading(false);
         }
@@ -74,7 +95,7 @@ export default function PayrollScreen() {
             });
             setShowAddModal(false);
             setForm({ name: '', hours: '', holidays: '', notes: '' });
-            loadSubmissions();
+            loadData();
             Alert.alert('Success', 'Employee added successfully');
         } catch (error) {
             console.log(error);
@@ -94,22 +115,33 @@ export default function PayrollScreen() {
         setShowPdfModal(true);
     };
 
+    const copyToClipboard = async (text: string) => {
+        await Clipboard.setStringAsync(text);
+        Alert.alert('Copied', 'Reference number copied to clipboard');
+    };
+
+    const handleOpenPayment = async (url: string) => {
+        if (!url) return;
+        await WebBrowser.openBrowserAsync(url);
+    };
+
     const downloadPdf = async () => {
         if (!pdfUrl) return;
 
         try {
             const filename = pdfUrl.split('/').pop() || 'document.pdf';
-            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            const fs = FileSystem as any;
+            const fileUri = `${fs.documentDirectory}${filename}`;
 
             const downloadRes = await FileSystem.downloadAsync(pdfUrl, fileUri);
 
             if (Platform.OS === 'android') {
-                const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                const permissions = await fs.StorageAccessFramework.requestDirectoryPermissionsAsync();
                 if (permissions.granted) {
-                    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: FileSystem.EncodingType.Base64 });
-                    await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'application/pdf')
+                    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: fs.EncodingType.Base64 });
+                    await fs.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'application/pdf')
                         .then(async (uri: string) => {
-                            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+                            await FileSystem.writeAsStringAsync(uri, base64, { encoding: fs.EncodingType.Base64 });
                             Alert.alert('Success', 'File saved to device');
                         })
                         .catch((e: any) => console.log(e));
@@ -140,9 +172,21 @@ export default function PayrollScreen() {
                     <View style={{ width: 40 }} />
                 </View>
 
-                {/* Filter / Month Selector */}
+                {/* Filter / Year & Month Selector */}
                 <View style={styles.filterSection}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthSelector}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                        {YEARS.map(y => (
+                            <TouchableOpacity
+                                key={y}
+                                style={[styles.yearChip, selectedYear === y && styles.yearChipActive]}
+                                onPress={() => setSelectedYear(y)}
+                            >
+                                <Text style={[styles.yearChipText, selectedYear === y && styles.yearChipTextActive]}>{y}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectorScroll} contentContainerStyle={{ paddingHorizontal: 16 }}>
                         {MONTHS.map(m => (
                             <TouchableOpacity
                                 key={m}
@@ -155,28 +199,73 @@ export default function PayrollScreen() {
                     </ScrollView>
                 </View>
 
-                <View style={styles.contentHeader}>
-                    <Text style={styles.sectionTitle}>Employee List ({selectedMonth})</Text>
-
-                    {/* Add Employee Button */}
-                    <TouchableOpacity
-                        style={styles.addBtn}
-                        onPress={() => setShowAddModal(true)}
-                    >
-                        <LinearGradient
-                            colors={['#3b82f6', '#14b8a6']}
-                            style={styles.addBtnGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
-                            <Ionicons name="add" size={20} color="#fff" />
-                            <Text style={styles.addBtnText}>Add Employee</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Employee List */}
                 <ScrollView contentContainerStyle={styles.listContent}>
+                    {/* Liability Section */}
+                    {liability && (
+                        <View style={styles.liabilityCard}>
+                            <LinearGradient
+                                colors={['#1e293b', '#334155']}
+                                style={styles.liabilityGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.liabilityHeader}>
+                                    <View>
+                                        <Text style={styles.liabilityLabel}>Monthly Liability</Text>
+                                        <Text style={styles.liabilityAmount}>£{liability.amount}</Text>
+                                    </View>
+                                    <View style={styles.liabilityStatus}>
+                                        <Ionicons name="alert-circle" size={20} color="#f59e0b" />
+                                        <Text style={styles.liabilityStatusText}>Pending Payment</Text>
+                                    </View>
+                                </View>
+
+                                {liability.payment_reference && (
+                                    <View style={styles.referenceContainer}>
+                                        <Text style={styles.referenceLabel}>Reference:</Text>
+                                        <TouchableOpacity
+                                            style={styles.referenceBox}
+                                            onPress={() => copyToClipboard(liability.payment_reference)}
+                                        >
+                                            <Text style={styles.referenceValue}>{liability.payment_reference}</Text>
+                                            <Ionicons name="copy-outline" size={16} color="#94a3b8" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {liability.payment_link && (
+                                    <TouchableOpacity
+                                        style={styles.payNowBtn}
+                                        onPress={() => handleOpenPayment(liability.payment_link)}
+                                    >
+                                        <Text style={styles.payNowBtnText}>Pay Now</Text>
+                                        <Ionicons name="open-outline" size={18} color="#fff" />
+                                    </TouchableOpacity>
+                                )}
+                            </LinearGradient>
+                        </View>
+                    )}
+
+                    <View style={styles.contentHeader}>
+                        <Text style={styles.sectionTitle}>Employee List ({selectedMonth})</Text>
+
+                        {/* Add Employee Button */}
+                        <TouchableOpacity
+                            style={styles.addBtn}
+                            onPress={() => setShowAddModal(true)}
+                        >
+                            <LinearGradient
+                                colors={['#3b82f6', '#14b8a6']}
+                                style={styles.addBtnGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Ionicons name="add" size={20} color="#fff" />
+                                <Text style={styles.addBtnText}>Add Employee</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+
                     {loading ? (
                         <ActivityIndicator size="large" color="#14b8a6" style={{ marginTop: 40 }} />
                     ) : submissions.length === 0 ? (
@@ -222,7 +311,69 @@ export default function PayrollScreen() {
                         </View>
                     )}
                 </ScrollView>
+
+                {/* FABs / Document Quick Actions */}
+                <View style={styles.fabContainer}>
+                    {p60p45s.length > 0 && (
+                        <TouchableOpacity
+                            style={[styles.extendedFab, { backgroundColor: '#8b5cf6' }]}
+                            onPress={() => p60p45s.length === 1
+                                ? handleViewPdf(p60p45s[0].file_path, `${p60p45s[0].type.toUpperCase()} - ${p60p45s[0].tax_year}`)
+                                : setShowDocListModal(true)
+                            }
+                        >
+                            <Ionicons name="document-text-outline" size={20} color="#fff" />
+                            <Text style={styles.fabText}>P60 & P45</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {starterForm && starterForm.file_path && (
+                        <TouchableOpacity
+                            style={[styles.extendedFab, { backgroundColor: '#3b82f6' }]}
+                            onPress={() => handleViewPdf(starterForm.file_path, 'Starter Form')}
+                        >
+                            <Ionicons name="person-add-outline" size={20} color="#fff" />
+                            <Text style={styles.fabText}>Starter Form</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </SafeAreaView>
+
+            {/* Document List Modal (P60/P45) */}
+            <Modal visible={showDocListModal} animationType="fade" transparent>
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity style={styles.modalOverlayClose} onPress={() => setShowDocListModal(false)} />
+                    <View style={styles.docListModalContent}>
+                        <View style={styles.docListHeader}>
+                            <Text style={styles.docListTitle}>P60 & P45 Documents</Text>
+                            <TouchableOpacity onPress={() => setShowDocListModal(false)}>
+                                <Ionicons name="close" size={24} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.docListScroll}>
+                            {p60p45s.map((doc) => (
+                                <TouchableOpacity
+                                    key={doc.id}
+                                    style={styles.docItem}
+                                    onPress={() => {
+                                        setShowDocListModal(false);
+                                        handleViewPdf(doc.file_path, `${doc.type.toUpperCase()} - ${doc.tax_year}`);
+                                    }}
+                                >
+                                    <View style={styles.docItemIcon}>
+                                        <Ionicons name="document" size={20} color="#8b5cf6" />
+                                    </View>
+                                    <View style={styles.docItemInfo}>
+                                        <Text style={styles.docItemType}>{doc.type.toUpperCase()}</Text>
+                                        <Text style={styles.docItemYear}>Tax Year: {doc.tax_year}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Add Employee Modal */}
             <Modal visible={showAddModal} animationType="slide" transparent>
@@ -334,8 +485,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-    filterSection: { marginBottom: 16 },
-    monthSelector: { paddingHorizontal: 16, maxHeight: 40 },
+    filterSection: { marginBottom: 16, gap: 10 },
+    selectorScroll: { maxHeight: 40 },
+    yearChip: {
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 8,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    },
+    yearChipActive: { backgroundColor: '#3b82f6', borderColor: '#3b82f6' },
+    yearChipText: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
+    yearChipTextActive: { color: '#fff' },
     monthChip: {
         paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
         backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 8,
@@ -398,4 +557,175 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)'
     },
     pdfTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1, textAlign: 'center', marginHorizontal: 10 },
+
+    // Liability Styles
+    liabilityCard: {
+        marginBottom: 20,
+        borderRadius: 20,
+        overflow: 'hidden',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    liabilityGradient: {
+        padding: 20,
+    },
+    liabilityHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    liabilityLabel: {
+        color: '#94a3b8',
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    liabilityAmount: {
+        color: '#fff',
+        fontSize: 32,
+        fontWeight: 'bold',
+    },
+    liabilityStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 6,
+    },
+    liabilityStatusText: {
+        color: '#f59e0b',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    referenceContainer: {
+        marginBottom: 16,
+    },
+    referenceLabel: {
+        color: '#64748b',
+        fontSize: 12,
+        marginBottom: 6,
+    },
+    referenceBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    referenceValue: {
+        color: '#e2e8f0',
+        fontSize: 14,
+        fontWeight: '600',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    payNowBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#3b82f6',
+        borderRadius: 14,
+        paddingVertical: 14,
+        gap: 8,
+    },
+    payNowBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+
+    // FAB Styles
+    fabContainer: {
+        position: 'absolute',
+        bottom: 30,
+        right: 20,
+        gap: 12,
+        alignItems: 'flex-end',
+    },
+    extendedFab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        borderRadius: 30,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4.65,
+        gap: 10,
+    },
+    fabText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+
+    // Doc List Modal
+    modalOverlayClose: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    docListModalContent: {
+        backgroundColor: '#1e293b',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '70%',
+        paddingBottom: 40,
+    },
+    docListHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
+    docListTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    docListScroll: {
+        padding: 16,
+    },
+    docItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 12,
+    },
+    docItemIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    docItemInfo: {
+        flex: 1,
+    },
+    docItemType: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    docItemYear: {
+        color: '#94a3b8',
+        fontSize: 13,
+    },
 });

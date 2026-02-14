@@ -90,6 +90,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'clientName' => $client->name,
         ]);
     })->name('clients.accounting.payroll');
+
+    Route::get('clients/{userId}/accounting/accounts', function ($userId) {
+        $client = \App\Models\User::findOrFail($userId);
+        return Inertia::render('accounting/accounts', [
+            'userId' => $client->id,
+            'clientName' => $client->name,
+        ]);
+    })->name('clients.accounting.accounts');
+
+    Route::get('clients/{userId}/accounting/corporation-tax', function ($userId) {
+        $client = \App\Models\User::findOrFail($userId);
+        return Inertia::render('accounting/corporation-tax', [
+            'userId' => $client->id,
+            'clientName' => $client->name,
+        ]);
+    })->name('clients.accounting.corporation-tax');
+
+    Route::get('clients/{userId}/accounting/vat', function ($userId) {
+        $client = \App\Models\User::findOrFail($userId);
+        return Inertia::render('accounting/vat', [
+            'userId' => $client->id,
+            'clientName' => $client->name,
+        ]);
+    })->name('clients.accounting.vat');
+
+    Route::get('clients/{userId}/accounting/self-assessment', function ($userId) {
+        $client = \App\Models\User::findOrFail($userId);
+        return Inertia::render('accounting/self-assessment', [
+            'userId' => $client->id,
+            'clientName' => $client->name,
+        ]);
+    })->name('clients.accounting.self-assessment');
 });
 
 require __DIR__ . '/settings.php';

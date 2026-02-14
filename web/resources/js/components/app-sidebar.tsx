@@ -32,11 +32,11 @@ const mainNavItems: NavItem[] = [
         href: '/meetings',
         icon: Calendar,
     },
-    {
-        title: 'Accounting',
-        href: '/accounting',
-        icon: BookOpen,
-    },
+    // {
+    //     title: 'Accounting',
+    //     href: '/accounting',
+    //     icon: BookOpen,
+    // },
 ];
 
 const footerNavItems: NavItem[] = [

@@ -19,6 +19,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/accountants', [\App\Http\Controllers\Api\SearchController::class, 'searchAccountants']);
     Route::get('/clients', [\App\Http\Controllers\Api\SearchController::class, 'searchClients']);
+    Route::post('/clients/{userId}/services', [\App\Http\Controllers\Api\ClientSettingsController::class, 'updateServices']);
 
     Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'index']);
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);

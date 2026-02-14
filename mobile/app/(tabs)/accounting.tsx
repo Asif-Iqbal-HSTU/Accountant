@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     StatusBar,
     RefreshControl,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -82,6 +83,11 @@ export default function AccountingScreen() {
         try {
             const userStr = await SecureStore.getItemAsync('user');
             if (userStr) setUser(JSON.parse(userStr));
+
+            // Fetch fresh user data to get updated services
+            const userRes = await api.get('/user');
+            setUser(userRes.data);
+            await SecureStore.setItemAsync('user', JSON.stringify(userRes.data));
 
             const infoRes = await api.get('/company-info');
             setCompanyInfo(infoRes.data);
@@ -160,33 +166,46 @@ export default function AccountingScreen() {
                     <View style={styles.cardsSection}>
                         <Text style={styles.sectionTitle}>Services</Text>
                         <View style={styles.cardsGrid}>
-                            {WIZARD_CARDS.map((card) => (
-                                <TouchableOpacity
-                                    key={card.id}
-                                    style={styles.wizardCard}
-                                    onPress={() => router.push(card.route as any)}
-                                    activeOpacity={0.7}
-                                >
-                                    <LinearGradient
-                                        colors={[card.colors[0] + '20', card.colors[1] + '10']}
-                                        style={styles.wizardCardGradient}
+                            {WIZARD_CARDS.map((card) => {
+                                const isActive = card.id === 'company-info' || (user?.services_config?.[card.id.replace(/-/g, '_')] === true);
+
+                                return (
+                                    <TouchableOpacity
+                                        key={card.id}
+                                        style={[styles.wizardCard, !isActive && { opacity: 0.5 }]}
+                                        onPress={() => isActive ? router.push(card.route as any) : Alert.alert('Service Disabled', 'Please contact your accountant to enable this service.')}
+                                        activeOpacity={isActive ? 0.7 : 1}
                                     >
                                         <LinearGradient
-                                            colors={[card.colors[0], card.colors[1]]}
-                                            style={styles.wizardIconContainer}
+                                            colors={isActive ? [card.colors[0] + '20', card.colors[1] + '10'] : ['rgba(148, 163, 184, 0.1)', 'rgba(148, 163, 184, 0.05)']}
+                                            style={styles.wizardCardGradient}
                                         >
-                                            <Ionicons name={card.icon as any} size={24} color="#fff" />
+                                            <LinearGradient
+                                                colors={isActive ? [card.colors[0], card.colors[1]] : ['#94a3b8', '#64748b']}
+                                                style={styles.wizardIconContainer}
+                                            >
+                                                <Ionicons name={card.icon as any} size={24} color="#fff" />
+                                            </LinearGradient>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Text style={[styles.wizardTitle, !isActive && { color: '#94a3b8' }]}>{card.title}</Text>
+                                                {!isActive && <Ionicons name="lock-closed" size={12} color="#94a3b8" />}
+                                            </View>
+                                            <Text style={styles.wizardSubtitle} numberOfLines={2}>
+                                                {isActive ? card.subtitle : 'This service is currently disabled for your account.'}
+                                            </Text>
+                                            {isActive ? (
+                                                <View style={styles.wizardArrow}>
+                                                    <Ionicons name="arrow-forward" size={16} color={card.colors[0]} />
+                                                </View>
+                                            ) : (
+                                                <View style={[styles.wizardArrow, { backgroundColor: 'rgba(255,255,255,0.02)' }]}>
+                                                    <Ionicons name="alert-circle-outline" size={16} color="#94a3b8" />
+                                                </View>
+                                            )}
                                         </LinearGradient>
-                                        <Text style={styles.wizardTitle}>{card.title}</Text>
-                                        <Text style={styles.wizardSubtitle} numberOfLines={2}>
-                                            {card.subtitle}
-                                        </Text>
-                                        <View style={styles.wizardArrow}>
-                                            <Ionicons name="arrow-forward" size={16} color={card.colors[0]} />
-                                        </View>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            ))}
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </View>
 

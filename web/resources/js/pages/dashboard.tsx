@@ -4,7 +4,7 @@ import { dashboard } from '@/routes';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, Send, MessageSquare, Users, Building2, Plus, Edit, PoundSterling } from 'lucide-react';
+import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, Send, MessageSquare, Users, Building2, Plus, Edit, PoundSterling, Calculator, FileText, Receipt, User, Settings, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import CompanyInfoForm from '@/components/accounting/company-info-form';
 
@@ -339,11 +339,9 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                             <p className="text-sm text-slate-500">{client.email}</p>
                                         </div>
                                     </div>
-                                    {client.unread_count > 0 && (
-                                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                            {client.unread_count} new
-                                        </span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {/* Header content removed, moving to message button */}
+                                    </div>
                                 </div>
 
                                 <div className="p-6 flex-1">
@@ -402,21 +400,96 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
 
                                             <button
                                                 onClick={() => setViewingChatClientId(client.id)}
-                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                                className="relative flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                                             >
                                                 <MessageSquare className="w-4 h-4" />
                                                 Message
+                                                {client.unread_count > 0 && (
+                                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full border-2 border-white dark:border-slate-800 shadow-sm">
+                                                        {client.unread_count}
+                                                    </span>
+                                                )}
                                             </button>
                                         </div>
 
-                                        <div className="pt-2">
-                                            <Link
-                                                href={`/clients/${client.id}/accounting/payroll`}
-                                                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
-                                            >
-                                                <PoundSterling className="w-4 h-4" />
-                                                Manage Payroll
-                                            </Link>
+                                        <div className="pt-2 grid grid-cols-1 gap-3">
+                                            {[
+                                                { id: 'payroll', label: 'Payroll', href: `/clients/${client.id}/accounting/payroll`, icon: PoundSterling, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20' },
+                                                { id: 'accounts', label: 'Accounts', href: `/clients/${client.id}/accounting/accounts`, icon: Calculator, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+                                                { id: 'corporation_tax', label: 'Corp Tax', href: `/clients/${client.id}/accounting/corporation-tax`, icon: FileText, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                                                { id: 'vat', label: 'VAT', href: `/clients/${client.id}/accounting/vat`, icon: Receipt, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
+                                                { id: 'self_assessment', label: 'Self Assessment', href: `/clients/${client.id}/accounting/self-assessment`, icon: User, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+                                            ].map((svc) => (
+                                                <div key={svc.id} className="flex items-center gap-2 group/row">
+                                                    <Link
+                                                        href={svc.href}
+                                                        className={`flex-1 flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 hover:border-blue-200 dark:hover:border-blue-800 transition-all ${client.services_config?.[svc.id] === false
+                                                            ? 'bg-slate-50 dark:bg-slate-800/50 grayscale opacity-75'
+                                                            : 'bg-white dark:bg-slate-800 shadow-sm'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-2 rounded-lg ${svc.bg} ${svc.color}`}>
+                                                                <svc.icon className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                                                    {svc.label}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                                                                    Manage Data
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {client.services_config?.[svc.id] === false && (
+                                                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
+                                                                    <X className="w-3 h-3 text-slate-400" />
+                                                                    <span className="text-[9px] font-bold text-slate-500 uppercase">Hidden</span>
+                                                                </div>
+                                                            )}
+                                                            <ArrowDown className="w-4 h-4 text-slate-300 dark:text-slate-600 -rotate-90" />
+                                                        </div>
+                                                    </Link>
+
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.preventDefault();
+                                                            const currentConfig = client.services_config || {
+                                                                payroll: true,
+                                                                accounts: true,
+                                                                corporation_tax: true,
+                                                                vat: true,
+                                                                self_assessment: true
+                                                            };
+                                                            const newConfig = {
+                                                                ...currentConfig,
+                                                                [svc.id]: currentConfig[svc.id] === false ? true : false
+                                                            };
+                                                            try {
+                                                                await axios.post(`/api/clients/${client.id}/services`, { services: newConfig });
+                                                                fetchClients();
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                            }
+                                                        }}
+                                                        title={client.services_config?.[svc.id] === false ? "Enable for client" : "Disable for client"}
+                                                        className={`flex flex-col items-center justify-center gap-1 w-14 py-2 rounded-xl border transition-all ${client.services_config?.[svc.id] === false
+                                                            ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 opacity-50'
+                                                            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/50 text-blue-600'
+                                                            }`}
+                                                    >
+                                                        <div className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${client.services_config?.[svc.id] === false ? 'bg-slate-300 dark:bg-slate-600' : 'bg-blue-600'
+                                                            }`}>
+                                                            <div className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${client.services_config?.[svc.id] === false ? 'translate-x-1' : 'translate-x-4.5'
+                                                                }`} />
+                                                        </div>
+                                                        <span className="text-[9px] font-bold uppercase tracking-tighter">
+                                                            {client.services_config?.[svc.id] === false ? 'OFF' : 'ON'}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>

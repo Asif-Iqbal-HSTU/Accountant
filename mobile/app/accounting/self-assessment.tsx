@@ -1,141 +1,285 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, Linking } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    StatusBar,
+    ActivityIndicator,
+    Alert,
+    Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import api from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
+import api, { API_URL } from '../../services/api';
 
-const YEARS = ['2023', '2024', '2025', '2026'];
+const YEARS = ['2023/2024', '2024/2025', '2025/2026'];
 
 export default function SelfAssessmentScreen() {
-    const [selectedYear, setSelectedYear] = useState('2025');
-    const [activeTab, setActiveTab] = useState(0);
-    const [data, setData] = useState<any>(null);
+    const [selectedYear, setSelectedYear] = useState('2024/2025');
+    const [taxData, setTaxData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => { loadData(); }, [selectedYear]);
+    // PDF Viewer Modal
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [pdfTitle, setPdfTitle] = useState('');
+
+    useEffect(() => {
+        loadData();
+    }, [selectedYear]);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/self-assessment?year=${selectedYear}`);
-            setData(res.data.length > 0 ? res.data[0] : null);
-        } catch (e) { console.log(e); }
-        finally { setLoading(false); }
+            const res = await api.get(`/self-assessment?tax_year=${selectedYear}`);
+            setTaxData(res.data.length > 0 ? res.data[0] : null);
+        } catch (error) {
+            console.log(error);
+            Alert.alert('Error', 'Failed to load Self Assessment data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getBaseUrl = () => API_URL.replace('/api', '');
+
+    const handleViewPdf = (path: string, title: string) => {
+        const fullUrl = path.startsWith('http') ? path : `${getBaseUrl()}${path}`;
+        setPdfUrl(fullUrl);
+        setPdfTitle(title);
+        setShowPdfModal(true);
+    };
+
+    const copyToClipboard = async (text: string, label: string) => {
+        await Clipboard.setStringAsync(text);
+        Alert.alert('Copied', `${label} copied to clipboard`);
+    };
+
+    const handleOpenPayment = async (url: string) => {
+        if (!url) return;
+        await WebBrowser.openBrowserAsync(url);
+    };
+
+    const downloadPdf = async () => {
+        if (!pdfUrl) return;
+        try {
+            const filename = pdfUrl.split('/').pop() || 'tax-return.pdf';
+            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            const downloadRes = await FileSystem.downloadAsync(pdfUrl, fileUri);
+
+            if (Platform.OS === 'android') {
+                const fs = FileSystem as any;
+                const permissions = await fs.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                if (permissions.granted) {
+                    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: fs.EncodingType.Base64 });
+                    await fs.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'application/pdf')
+                        .then(async (uri: string) => {
+                            await FileSystem.writeAsStringAsync(uri, base64, { encoding: fs.EncodingType.Base64 });
+                            Alert.alert('Success', 'File saved to device');
+                        });
+                } else {
+                    Sharing.shareAsync(downloadRes.uri);
+                }
+            } else {
+                Sharing.shareAsync(downloadRes.uri);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to download file');
+        }
     };
 
     return (
-        <View style={s.container}>
+        <View style={styles.container}>
             <StatusBar barStyle="light-content" />
             <LinearGradient colors={['#0f172a', '#1e293b', '#0f172a']} style={StyleSheet.absoluteFill} />
-            <SafeAreaView style={s.safeArea}>
-                <View style={s.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={s.headerTitle}>Self Assessment</Text>
+                    <Text style={styles.headerTitle}>Self Assessment</Text>
                     <View style={{ width: 40 }} />
                 </View>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-                    {/* UTR Number */}
-                    {data?.utr_number && (
-                        <View style={s.utrCard}>
-                            <Text style={s.utrLabel}>UTR Number</Text>
-                            <Text style={s.utrValue}>{data.utr_number}</Text>
-                        </View>
-                    )}
 
-                    {/* Year Selector */}
-                    <View style={s.yearRow}>
+                {/* Filters */}
+                <View style={styles.filterSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
                         {YEARS.map(y => (
-                            <TouchableOpacity key={y} style={[s.yearChip, selectedYear === y && s.yearChipActive]} onPress={() => setSelectedYear(y)}>
-                                <Text style={[s.yearChipText, selectedYear === y && s.yearChipTextActive]}>{y}</Text>
+                            <TouchableOpacity
+                                key={y}
+                                style={[styles.chip, selectedYear === y && styles.chipActive]}
+                                onPress={() => setSelectedYear(y)}
+                            >
+                                <Text style={[styles.chipText, selectedYear === y && styles.chipTextActive]}>{y}</Text>
                             </TouchableOpacity>
                         ))}
-                    </View>
+                    </ScrollView>
+                </View>
 
-                    {/* Tabs */}
-                    <View style={s.tabBar}>
-                        {['Tax Return', 'Tax Liability'].map((t, i) => (
-                            <TouchableOpacity key={t} style={[s.tab, activeTab === i && s.tabActive]} onPress={() => setActiveTab(i)}>
-                                <Text style={[s.tabText, activeTab === i && s.tabTextActive]}>{t}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
-                    {loading ? <ActivityIndicator size="large" color="#14b8a6" style={{ marginTop: 40 }} /> : activeTab === 0 ? (
-                        data?.tax_return_file ? (
-                            <View style={s.docCard}>
-                                <View style={s.docInfo}>
-                                    <LinearGradient colors={['#06b6d4', '#0891b2']} style={s.docIcon}><Ionicons name="document-text" size={28} color="#fff" /></LinearGradient>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={s.docTitle}>Tax Return — {selectedYear}</Text>
-                                        <Text style={s.docFilename}>{data.tax_return_filename || 'tax_return.pdf'}</Text>
-                                    </View>
-                                </View>
-                                <TouchableOpacity style={s.dlBtn} onPress={() => Linking.openURL(data.tax_return_file)}>
-                                    <Ionicons name="eye-outline" size={18} color="#fff" /><Text style={s.dlText}>View & Download</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={s.empty}><Ionicons name="document-outline" size={48} color="#475569" /><Text style={s.emptyText}>No tax return for {selectedYear}</Text><Text style={s.emptySub}>Your accountant will upload it</Text></View>
-                        )
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#38bdf8" style={{ marginTop: 40 }} />
                     ) : (
-                        data?.liability_amount ? (
-                            <View style={s.liabCard}>
-                                <Text style={s.liabLabel}>Tax Liability — {selectedYear}</Text>
-                                <Text style={s.liabAmount}>£{parseFloat(data.liability_amount).toFixed(2)}</Text>
-                                {data.payment_reference && <View style={s.refRow}><Text style={s.refLabel}>Payment Ref</Text><Text style={s.refValue}>{data.payment_reference}</Text></View>}
-                                {data.payment_link && <TouchableOpacity style={s.payBtn} onPress={() => Linking.openURL(data.payment_link)}><LinearGradient colors={['#06b6d4', '#0891b2']} style={s.payGrad}><Ionicons name="card-outline" size={18} color="#fff" /><Text style={s.payText}>Pay Now</Text></LinearGradient></TouchableOpacity>}
+                        <>
+                            {/* Liability Card */}
+                            <View style={styles.liabilityCard}>
+                                <LinearGradient
+                                    colors={['#0ea5e9', '#0284c7']}
+                                    style={styles.liabilityGradient}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                >
+                                    <View style={styles.liabilityHeader}>
+                                        <View>
+                                            <Text style={styles.liabilityLabel}>SA LIABILITY ({selectedYear})</Text>
+                                            <Text style={styles.liabilityAmount}>
+                                                {taxData?.liability_amount ? `£${parseFloat(taxData.liability_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '£0.00'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.statusBadge}>
+                                            <Ionicons name="person" size={16} color="#fff" />
+                                            <Text style={styles.statusText}>PERSONAL</Text>
+                                        </View>
+                                    </View>
+
+                                    {taxData?.utr_number && (
+                                        <View style={styles.refSection}>
+                                            <Text style={styles.refLabel}>UTR Number</Text>
+                                            <TouchableOpacity
+                                                style={styles.refBox}
+                                                onPress={() => copyToClipboard(taxData.utr_number, 'UTR')}
+                                            >
+                                                <Text style={styles.refValue}>{taxData.utr_number}</Text>
+                                                <Ionicons name="copy-outline" size={16} color="rgba(255,255,255,0.7)" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+
+                                    {taxData?.payment_link && (
+                                        <TouchableOpacity
+                                            style={styles.payBtn}
+                                            onPress={() => handleOpenPayment(taxData.payment_link)}
+                                        >
+                                            <Text style={styles.payBtnText}>Pay Online</Text>
+                                            <Ionicons name="open-outline" size={18} color="#0284c7" />
+                                        </TouchableOpacity>
+                                    )}
+                                </LinearGradient>
                             </View>
-                        ) : (
-                            <View style={s.empty}><Ionicons name="cash-outline" size={48} color="#475569" /><Text style={s.emptyText}>No liability for {selectedYear}</Text><Text style={s.emptySub}>Liability info will appear here</Text></View>
-                        )
+
+                            {/* Self Assessment Document */}
+                            <Text style={styles.sectionTitle}>Tax Documents</Text>
+                            <TouchableOpacity
+                                style={[styles.docCard, !taxData?.tax_return_file && styles.docCardDisabled]}
+                                disabled={!taxData?.tax_return_file}
+                                onPress={() => handleViewPdf(taxData.tax_return_file, `SA100 - ${selectedYear}`)}
+                            >
+                                <View style={[styles.docIcon, { backgroundColor: 'rgba(14, 165, 233, 0.15)' }]}>
+                                    <Ionicons name="document-text" size={24} color="#0ea5e9" />
+                                </View>
+                                <View style={styles.docInfo}>
+                                    <Text style={styles.docTitle}>SA100 Tax Return</Text>
+                                    <Text style={styles.docSubtitle}>{taxData?.tax_return_file ? 'Ready to view & download' : 'Awaiting upload'}</Text>
+                                </View>
+                                {taxData?.tax_return_file && <Ionicons name="chevron-forward" size={20} color="#64748b" />}
+                            </TouchableOpacity>
+
+                            <View style={styles.infoCard}>
+                                <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+                                <Text style={styles.infoText}>
+                                    The deadline for online Self Assessment tax returns and paying tax you owe is 31 January following the end of the tax year.
+                                </Text>
+                            </View>
+                        </>
                     )}
-                    <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
+
+            {/* PDF View Modal */}
+            {showPdfModal && (
+                <View style={StyleSheet.absoluteFill}>
+                    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                        <View style={styles.pdfHeader}>
+                            <TouchableOpacity onPress={() => setShowPdfModal(false)} style={styles.backBtn}>
+                                <Ionicons name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                            <Text style={styles.pdfTitle} numberOfLines={1}>{pdfTitle}</Text>
+                            <TouchableOpacity onPress={downloadPdf} style={styles.backBtn}>
+                                <Ionicons name="download-outline" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+                            <WebView
+                                source={{ uri: (Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${pdfUrl}` : pdfUrl) || '' }}
+                                style={{ flex: 1 }}
+                                startInLoadingState
+                            />
+                        </View>
+                    </SafeAreaView>
+                </View>
+            )}
         </View>
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1 }, safeArea: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-    backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-    content: { paddingHorizontal: 20 },
-    utrCard: { backgroundColor: 'rgba(6,182,212,0.1)', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(6,182,212,0.2)' },
-    utrLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600', letterSpacing: 1, marginBottom: 4 },
-    utrValue: { fontSize: 20, fontWeight: 'bold', color: '#06b6d4' },
-    yearRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-    yearChip: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
-    yearChipActive: { backgroundColor: '#06b6d4' },
-    yearChipText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
-    yearChipTextActive: { color: '#fff' },
-    tabBar: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-    tab: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-    tabActive: { backgroundColor: 'rgba(6,182,212,0.15)', borderColor: '#06b6d4' },
-    tabText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-    tabTextActive: { color: '#06b6d4' },
-    docCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-    docInfo: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-    docIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-    docTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-    docFilename: { fontSize: 12, color: '#64748b', marginTop: 4 },
-    dlBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#06b6d4', borderRadius: 10, paddingVertical: 12 },
-    dlText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-    liabCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-    liabLabel: { fontSize: 13, color: '#94a3b8', marginBottom: 4 },
-    liabAmount: { fontSize: 32, fontWeight: 'bold', color: '#06b6d4', marginBottom: 16 },
-    refRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: 12, marginBottom: 16 },
-    refLabel: { fontSize: 13, color: '#64748b' },
-    refValue: { fontSize: 13, fontWeight: '600', color: '#e2e8f0' },
-    payBtn: { borderRadius: 12, overflow: 'hidden' },
-    payGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-    payText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-    empty: { alignItems: 'center', paddingVertical: 50 },
-    emptyText: { fontSize: 16, fontWeight: '600', color: '#94a3b8', marginTop: 12 },
-    emptySub: { fontSize: 13, color: '#64748b', marginTop: 4 },
+const styles = StyleSheet.create({
+    container: { flex: 1 },
+    safeArea: { flex: 1 },
+    header: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 12,
+    },
+    backBtn: {
+        width: 40, height: 40, borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+    filterSection: { marginBottom: 20 },
+    chip: {
+        paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 10,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    },
+    chipActive: { backgroundColor: '#0ea5e9', borderColor: '#0ea5e9' },
+    chipText: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+    chipTextActive: { color: '#fff' },
+    scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+    liabilityCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 30, elevation: 8, shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+    liabilityGradient: { padding: 24 },
+    liabilityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+    liabilityLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
+    liabilityAmount: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 4 },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    statusText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+    refSection: { marginBottom: 24 },
+    refLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 8 },
+    refBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    refValue: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+    payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', paddingVertical: 16, borderRadius: 16, gap: 10 },
+    payBtnText: { color: '#0284c7', fontSize: 16, fontWeight: 'bold' },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 16 },
+    docCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+    docCardDisabled: { opacity: 0.5 },
+    docIcon: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    docInfo: { flex: 1 },
+    docTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
+    docSubtitle: { fontSize: 13, color: '#64748b' },
+    infoCard: { flexDirection: 'row', padding: 16, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 16, gap: 12, alignItems: 'center' },
+    infoText: { flex: 1, fontSize: 12, color: '#64748b', lineHeight: 18 },
+    pdfHeader: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)'
+    },
+    pdfTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1, textAlign: 'center' },
 });

@@ -7,22 +7,31 @@ import {
     TouchableOpacity,
     StatusBar,
     ActivityIndicator,
-    Linking,
+    Alert,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import api from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
+import api, { API_URL } from '../../services/api';
 
 const YEARS = ['2023', '2024', '2025', '2026'];
-const CT_TABS = ['CT600', 'Tax Computation', 'Tax Liability'];
 
 export default function CorporationTaxScreen() {
     const [selectedYear, setSelectedYear] = useState('2025');
-    const [activeTab, setActiveTab] = useState(0);
     const [taxData, setTaxData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+
+    // PDF Viewer Modal
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [pdfTitle, setPdfTitle] = useState('');
 
     useEffect(() => {
         loadData();
@@ -34,118 +43,59 @@ export default function CorporationTaxScreen() {
             const res = await api.get(`/corporation-tax?year=${selectedYear}`);
             setTaxData(res.data.length > 0 ? res.data[0] : null);
         } catch (error) {
-            console.log('Error loading corporation tax:', error);
+            console.log(error);
+            Alert.alert('Error', 'Failed to load tax data');
         } finally {
             setLoading(false);
         }
     };
 
-    const renderCT600 = () => (
-        <View>
-            {taxData?.ct600_file ? (
-                <View style={styles.docCard}>
-                    <View style={styles.docInfo}>
-                        <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.docIcon}>
-                            <Ionicons name="document-text" size={28} color="#fff" />
-                        </LinearGradient>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.docTitle}>CT600 — {selectedYear}</Text>
-                            <Text style={styles.docFilename}>{taxData.ct600_filename || 'ct600.pdf'}</Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.viewDownloadBtn}
-                        onPress={() => Linking.openURL(taxData.ct600_file)}
-                    >
-                        <Ionicons name="eye-outline" size={18} color="#fff" />
-                        <Text style={styles.viewDownloadText}>View & Download</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="document-outline" size={48} color="#475569" />
-                    <Text style={styles.emptyText}>No CT600 for {selectedYear}</Text>
-                    <Text style={styles.emptySubtext}>Your accountant will upload it</Text>
-                </View>
-            )}
-        </View>
-    );
+    const getBaseUrl = () => API_URL.replace('/api', '');
 
-    const renderTaxComputation = () => (
-        <View>
-            {taxData?.tax_computation_file ? (
-                <View style={styles.docCard}>
-                    <View style={styles.docInfo}>
-                        <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.docIcon}>
-                            <Ionicons name="calculator" size={28} color="#fff" />
-                        </LinearGradient>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.docTitle}>Tax Computation — {selectedYear}</Text>
-                            <Text style={styles.docFilename}>{taxData.tax_computation_filename || 'computation.pdf'}</Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.viewDownloadBtn}
-                        onPress={() => Linking.openURL(taxData.tax_computation_file)}
-                    >
-                        <Ionicons name="eye-outline" size={18} color="#fff" />
-                        <Text style={styles.viewDownloadText}>View & Download</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="calculator-outline" size={48} color="#475569" />
-                    <Text style={styles.emptyText}>No computation for {selectedYear}</Text>
-                    <Text style={styles.emptySubtext}>Your accountant will upload it</Text>
-                </View>
-            )}
-        </View>
-    );
+    const handleViewPdf = (path: string, title: string) => {
+        const fullUrl = path.startsWith('http') ? path : `${getBaseUrl()}${path}`;
+        setPdfUrl(fullUrl);
+        setPdfTitle(title);
+        setShowPdfModal(true);
+    };
 
-    const renderTaxLiability = () => (
-        <View>
-            {taxData?.liability_amount ? (
-                <View style={styles.liabilityCard}>
-                    <View style={styles.liabilityHeader}>
-                        <Text style={styles.liabilityLabel}>Tax Liability</Text>
-                        <Text style={styles.liabilityAmount}>£{parseFloat(taxData.liability_amount).toFixed(2)}</Text>
-                    </View>
+    const copyToClipboard = async (text: string) => {
+        await Clipboard.setStringAsync(text);
+        Alert.alert('Copied', 'Reference number copied to clipboard');
+    };
 
-                    {taxData.payment_reference && (
-                        <View style={styles.refRow}>
-                            <Text style={styles.refLabel}>Payment Reference</Text>
-                            <Text style={styles.refValue}>{taxData.payment_reference}</Text>
-                        </View>
-                    )}
+    const handleOpenPayment = async (url: string) => {
+        if (!url) return;
+        await WebBrowser.openBrowserAsync(url);
+    };
 
-                    {taxData.payment_link && (
-                        <TouchableOpacity
-                            style={styles.payBtn}
-                            onPress={() => Linking.openURL(taxData.payment_link)}
-                        >
-                            <LinearGradient
-                                colors={['#f59e0b', '#d97706']}
-                                style={styles.payBtnGradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                            >
-                                <Ionicons name="card-outline" size={18} color="#fff" />
-                                <Text style={styles.payBtnText}>Pay Now</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="cash-outline" size={48} color="#475569" />
-                    <Text style={styles.emptyText}>No liability for {selectedYear}</Text>
-                    <Text style={styles.emptySubtext}>Liability info will appear here</Text>
-                </View>
-            )}
-        </View>
-    );
+    const downloadPdf = async () => {
+        if (!pdfUrl) return;
+        try {
+            const filename = pdfUrl.split('/').pop() || 'document.pdf';
+            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            const downloadRes = await FileSystem.downloadAsync(pdfUrl, fileUri);
 
-    const tabContent = [renderCT600, renderTaxComputation, renderTaxLiability];
+            if (Platform.OS === 'android') {
+                const fs = FileSystem as any;
+                const permissions = await fs.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                if (permissions.granted) {
+                    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: fs.EncodingType.Base64 });
+                    await fs.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'application/pdf')
+                        .then(async (uri: string) => {
+                            await FileSystem.writeAsStringAsync(uri, base64, { encoding: fs.EncodingType.Base64 });
+                            Alert.alert('Success', 'File saved to device');
+                        });
+                } else {
+                    Sharing.shareAsync(downloadRes.uri);
+                }
+            } else {
+                Sharing.shareAsync(downloadRes.uri);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to download file');
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -161,44 +111,134 @@ export default function CorporationTaxScreen() {
                     <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-                    {/* Year Selector */}
-                    <View style={styles.yearRow}>
-                        {YEARS.map((year) => (
+                {/* Year Selector */}
+                <View style={styles.filterSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearSelector}>
+                        {YEARS.map(y => (
                             <TouchableOpacity
-                                key={year}
-                                style={[styles.yearChip, selectedYear === year && styles.yearChipActive]}
-                                onPress={() => setSelectedYear(year)}
+                                key={y}
+                                style={[styles.yearChip, selectedYear === y && styles.yearChipActive]}
+                                onPress={() => setSelectedYear(y)}
                             >
-                                <Text style={[styles.yearChipText, selectedYear === year && styles.yearChipTextActive]}>
-                                    {year}
-                                </Text>
+                                <Text style={[styles.yearChipText, selectedYear === y && styles.yearChipTextActive]}>{y}</Text>
                             </TouchableOpacity>
                         ))}
-                    </View>
+                    </ScrollView>
+                </View>
 
-                    {/* Tabs */}
-                    <View style={styles.tabBar}>
-                        {CT_TABS.map((tab, i) => (
-                            <TouchableOpacity
-                                key={tab}
-                                style={[styles.tab, activeTab === i && styles.tabActive]}
-                                onPress={() => setActiveTab(i)}
-                            >
-                                <Text style={[styles.tabText, activeTab === i && styles.tabTextActive]}>{tab}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
+                <ScrollView contentContainerStyle={styles.scrollContent}>
                     {loading ? (
-                        <ActivityIndicator size="large" color="#14b8a6" style={{ marginTop: 40 }} />
+                        <ActivityIndicator size="large" color="#f59e0b" style={{ marginTop: 40 }} />
                     ) : (
-                        tabContent[activeTab]()
-                    )}
+                        <>
+                            {/* Liability Section */}
+                            <View style={styles.liabilityCard}>
+                                <LinearGradient
+                                    colors={['#f59e0b', '#d97706']}
+                                    style={styles.liabilityGradient}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                >
+                                    <View style={styles.liabilityHeader}>
+                                        <View>
+                                            <Text style={styles.liabilityLabel}>CT LIABILITY ({selectedYear})</Text>
+                                            <Text style={styles.liabilityAmount}>
+                                                {taxData?.liability_amount ? `£${parseFloat(taxData.liability_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '£0.00'}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.statusBadge}>
+                                            <Ionicons name="alert-circle" size={16} color="#fff" />
+                                            <Text style={styles.statusText}>PENDING</Text>
+                                        </View>
+                                    </View>
 
-                    <View style={{ height: 40 }} />
+                                    {taxData?.payment_reference && (
+                                        <View style={styles.refSection}>
+                                            <Text style={styles.refLabel}>Payment Reference</Text>
+                                            <TouchableOpacity
+                                                style={styles.refBox}
+                                                onPress={() => copyToClipboard(taxData.payment_reference)}
+                                            >
+                                                <Text style={styles.refValue}>{taxData.payment_reference}</Text>
+                                                <Ionicons name="copy-outline" size={16} color="rgba(255,255,255,0.7)" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+
+                                    {taxData?.payment_link && (
+                                        <TouchableOpacity
+                                            style={styles.payBtn}
+                                            onPress={() => handleOpenPayment(taxData.payment_link)}
+                                        >
+                                            <Text style={styles.payBtnText}>Pay Online</Text>
+                                            <Ionicons name="open-outline" size={18} color="#f59e0b" />
+                                        </TouchableOpacity>
+                                    )}
+                                </LinearGradient>
+                            </View>
+
+                            {/* Documents Section */}
+                            <Text style={styles.sectionTitle}>Tax Documents</Text>
+
+                            {/* CT600 */}
+                            <TouchableOpacity
+                                style={[styles.docCard, !taxData?.ct600_file && styles.docCardDisabled]}
+                                disabled={!taxData?.ct600_file}
+                                onPress={() => handleViewPdf(taxData.ct600_file, `CT600 - ${selectedYear}`)}
+                            >
+                                <View style={[styles.docIcon, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+                                    <Ionicons name="document-text" size={24} color="#3b82f6" />
+                                </View>
+                                <View style={styles.docInfo}>
+                                    <Text style={styles.docTitle}>CT600 Tax Return</Text>
+                                    <Text style={styles.docSubtitle}>{taxData?.ct600_file ? 'Ready to view & download' : 'Not uploaded yet'}</Text>
+                                </View>
+                                {taxData?.ct600_file && <Ionicons name="chevron-forward" size={20} color="#64748b" />}
+                            </TouchableOpacity>
+
+                            {/* Computation */}
+                            <TouchableOpacity
+                                style={[styles.docCard, !taxData?.tax_computation_file && styles.docCardDisabled]}
+                                disabled={!taxData?.tax_computation_file}
+                                onPress={() => handleViewPdf(taxData.tax_computation_file, `Computation - ${selectedYear}`)}
+                            >
+                                <View style={[styles.docIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                                    <Ionicons name="calculator" size={24} color="#10b981" />
+                                </View>
+                                <View style={styles.docInfo}>
+                                    <Text style={styles.docTitle}>Tax Computation</Text>
+                                    <Text style={styles.docSubtitle}>{taxData?.tax_computation_file ? 'Ready to view & download' : 'Not uploaded yet'}</Text>
+                                </View>
+                                {taxData?.tax_computation_file && <Ionicons name="chevron-forward" size={20} color="#64748b" />}
+                            </TouchableOpacity>
+                        </>
+                    )}
                 </ScrollView>
             </SafeAreaView>
+
+            {/* PDF View Modal */}
+            {showPdfModal && (
+                <View style={StyleSheet.absoluteFill}>
+                    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                        <View style={styles.pdfHeader}>
+                            <TouchableOpacity onPress={() => setShowPdfModal(false)} style={styles.backBtn}>
+                                <Ionicons name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                            <Text style={styles.pdfTitle} numberOfLines={1}>{pdfTitle}</Text>
+                            <TouchableOpacity onPress={downloadPdf} style={styles.backBtn}>
+                                <Ionicons name="download-outline" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+                            <WebView
+                                source={{ uri: (Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${pdfUrl}` : pdfUrl) || '' }}
+                                style={{ flex: 1 }}
+                                startInLoadingState
+                            />
+                        </View>
+                    </SafeAreaView>
+                </View>
+            )}
         </View>
     );
 }
@@ -215,62 +255,41 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.05)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-    content: { paddingHorizontal: 20 },
-    yearRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+    filterSection: { marginBottom: 20 },
+    yearSelector: { paddingHorizontal: 16 },
     yearChip: {
-        flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24,
+        backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 10,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     },
-    yearChipActive: { backgroundColor: '#f59e0b' },
-    yearChipText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
+    yearChipActive: { backgroundColor: '#f59e0b', borderColor: '#f59e0b' },
+    yearChipText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
     yearChipTextActive: { color: '#fff' },
-    tabBar: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-    tab: {
-        flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+    liabilityCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 30, elevation: 8, shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+    liabilityGradient: { padding: 24 },
+    liabilityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+    liabilityLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
+    liabilityAmount: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 4 },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    statusText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+    refSection: { marginBottom: 24 },
+    refLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 8 },
+    refBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    refValue: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+    payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', paddingVertical: 16, borderRadius: 16, gap: 10 },
+    payBtnText: { color: '#f59e0b', fontSize: 16, fontWeight: 'bold' },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 16 },
+    docCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+    docCardDisabled: { opacity: 0.5 },
+    docIcon: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    docInfo: { flex: 1 },
+    docTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
+    docSubtitle: { fontSize: 13, color: '#64748b' },
+    pdfHeader: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)'
     },
-    tabActive: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' },
-    tabText: { fontSize: 11, fontWeight: '600', color: '#64748b' },
-    tabTextActive: { color: '#f59e0b' },
-    docCard: {
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16,
-        padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    },
-    docInfo: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-    docIcon: {
-        width: 56, height: 56, borderRadius: 16,
-        justifyContent: 'center', alignItems: 'center',
-    },
-    docTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-    docFilename: { fontSize: 12, color: '#64748b', marginTop: 4 },
-    viewDownloadBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, backgroundColor: '#f59e0b', borderRadius: 10, paddingVertical: 12,
-    },
-    viewDownloadText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-    liabilityCard: {
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16,
-        padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    },
-    liabilityHeader: { marginBottom: 16 },
-    liabilityLabel: { fontSize: 13, color: '#94a3b8', marginBottom: 4 },
-    liabilityAmount: { fontSize: 32, fontWeight: 'bold', color: '#f59e0b' },
-    refRow: {
-        flexDirection: 'row', justifyContent: 'space-between',
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10,
-        padding: 12, marginBottom: 16,
-    },
-    refLabel: { fontSize: 13, color: '#64748b' },
-    refValue: { fontSize: 13, fontWeight: '600', color: '#e2e8f0' },
-    payBtn: { borderRadius: 12, overflow: 'hidden' },
-    payBtnGradient: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, paddingVertical: 14,
-    },
-    payBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-    emptyState: { alignItems: 'center', paddingVertical: 50 },
-    emptyText: { fontSize: 16, fontWeight: '600', color: '#94a3b8', marginTop: 12 },
-    emptySubtext: { fontSize: 13, color: '#64748b', marginTop: 4 },
+    pdfTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1, textAlign: 'center' },
 });

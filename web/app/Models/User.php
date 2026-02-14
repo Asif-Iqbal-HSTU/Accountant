@@ -49,6 +49,15 @@ class User extends Authenticatable
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'services_config',
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -60,6 +69,39 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function services()
+    {
+        return $this->hasMany(ClientService::class);
+    }
+
+    protected function servicesConfig(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function () {
+                $defaults = [
+                    'payroll' => false,
+                    'accounts' => false,
+                    'corporation_tax' => false,
+                    'vat' => false,
+                    'self_assessment' => false,
+                ];
+
+                // Eager load services if relation loaded, or fetch if needed (though accessing attribute usually implies need)
+                // However, since this is an appended attribute, we should be careful about N+1.
+                // For simplicity now, we iterate over the loaded relation if available.
+
+                $userServices = $this->services; 
+
+                $config = [];
+                foreach ($userServices as $service) {
+                    $config[$service->service] = $service->is_active;
+                }
+                
+                return array_merge($defaults, $config);
+            },
+        );
     }
     public function sentMessages()
     {

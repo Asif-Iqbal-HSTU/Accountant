@@ -36,7 +36,6 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
 
     // Data
     const [submissions, setSubmissions] = useState<any[]>([]);
-    const [payslips, setPayslips] = useState<any[]>([]);
     const [liabilities, setLiabilities] = useState<any[]>([]);
     const [starterForm, setStarterForm] = useState<any>(null);
     const [p60p45s, setP60p45s] = useState<any[]>([]);
@@ -70,7 +69,7 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
         setLoading(true);
         try {
             const params = new URLSearchParams();
-            if (activeTab === 'submissions' || activeTab === 'payslips' || activeTab === 'liabilities') {
+            if (activeTab === 'submissions' || activeTab === 'liabilities') {
                 params.append('year', selectedYear);
             }
             if (activeTab === 'p60-p45') {
@@ -83,7 +82,6 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
             let endpoint = '';
             switch (activeTab) {
                 case 'submissions': endpoint = '/api/payroll/submissions'; break;
-                case 'payslips': endpoint = '/api/payroll/payslips'; break;
                 case 'liabilities': endpoint = '/api/payroll/liabilities'; break;
                 case 'starter-form': endpoint = '/api/payroll/starter-form'; break;
                 case 'p60-p45': endpoint = '/api/payroll/p60-p45'; break;
@@ -93,7 +91,6 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                 const res = await axios.get(`${endpoint}?${params.toString()}`);
                 switch (activeTab) {
                     case 'submissions': setSubmissions(res.data); break;
-                    case 'payslips': setPayslips(res.data); break;
                     case 'liabilities': setLiabilities(res.data); break;
                     case 'starter-form': setStarterForm(res.data); break;
                     case 'p60-p45': setP60p45s(res.data); break;
@@ -332,43 +329,6 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
         </div>
     );
 
-    const renderPayslips = () => (
-        <div className="space-y-4">
-            {isAccountant && (
-                <div className="flex justify-end mb-4">
-                    <Button onClick={() => {
-                        setUploadPayslipForm({ month: '', file: null });
-                        setIsUploadPayslipOpen(true);
-                    }}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Payslip
-                    </Button>
-                </div>
-            )}
-            {MONTHS.map((month) => {
-                const payslip = payslips.find((p) => p.month === month);
-                return (
-                    <div key={month} className="flex justify-between items-center p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${payslip ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
-                                <FileText className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-900 dark:text-white">{month}</h4>
-                                <p className="text-xs text-slate-500">{payslip ? payslip.filename : 'No payslip available'}</p>
-                            </div>
-                        </div>
-                        {payslip && (
-                            <Button variant="outline" size="sm" onClick={() => window.open(payslip.file_path, '_blank')}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                            </Button>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
 
     const renderLiabilities = () => (
         <div className="space-y-4">
@@ -603,11 +563,11 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                                 Payroll
                                 {clientName && <span className="text-teal-500"> - {clientName}</span>}
                             </h1>
-                            <p className="text-slate-500 dark:text-slate-400">Manage submissions, payslips and P60s</p>
+                            <p className="text-slate-500 dark:text-slate-400">Manage submissions, liabilities and P60s</p>
                         </div>
                     </div>
                     {/* Annual Year Selector for general tabs */}
-                    {['submissions', 'payslips', 'liabilities'].includes(activeTab) && (
+                    {['submissions', 'liabilities'].includes(activeTab) && (
                         <Select value={selectedYear} onValueChange={setSelectedYear}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Year" />
@@ -624,8 +584,7 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                 {/* Tabs Navigation */}
                 <div className="flex overflow-x-auto pb-4 gap-2 mb-6 border-b border-slate-200 dark:border-slate-700">
                     {[
-                        { id: 'submissions', label: 'Submit Hours' },
-                        { id: 'payslips', label: 'Payslips' },
+                        { id: 'submissions', label: 'Submitted Hours' },
                         { id: 'liabilities', label: 'Liabilities' },
                         { id: 'starter-form', label: 'Starter Form' },
                         { id: 'p60-p45', label: 'P60 & P45' },
@@ -650,7 +609,6 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                 ) : (
                     <div className="min-h-[400px]">
                         {activeTab === 'submissions' && renderSubmissions()}
-                        {activeTab === 'payslips' && renderPayslips()}
                         {activeTab === 'liabilities' && renderLiabilities()}
                         {activeTab === 'starter-form' && renderStarterForm()}
                         {activeTab === 'p60-p45' && renderP60P45()}
