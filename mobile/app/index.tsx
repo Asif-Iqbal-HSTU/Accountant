@@ -56,7 +56,7 @@ export default function Index() {
         return <Redirect href="/(tabs)" />;
     }
 
-    return <Redirect href="/setup" />;
+    return <Redirect href="/login" />;
 }
 
 const styles = StyleSheet.create({

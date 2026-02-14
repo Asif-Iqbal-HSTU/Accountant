@@ -11,285 +11,119 @@ import {
     Alert,
     ActivityIndicator,
     Linking,
+    Platform,
+    Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import api from '../../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { WebView } from 'react-native-webview';
+import api, { API_URL } from '../../services/api';
 
 const MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-const TAX_YEARS_P60 = ['2023/2024', '2024/2025', '2025/2026'];
-const TABS = ['Submit Hours', 'Payslips', 'Liabilities', 'Starter Form', 'P60/P45'];
 
 export default function PayrollScreen() {
-    const [activeTab, setActiveTab] = useState(0);
     const [selectedYear, setSelectedYear] = useState('2024/2025');
+    const [selectedMonth, setSelectedMonth] = useState(MONTHS[new Date().getMonth()]);
     const [loading, setLoading] = useState(false);
-
-    // Submit Hours state
-    const [showSubmitModal, setShowSubmitModal] = useState(false);
-    const [selectedMonth, setSelectedMonth] = useState('');
-    const [submitForm, setSubmitForm] = useState({ name: '', hours: '', holidays: '', notes: '' });
     const [submissions, setSubmissions] = useState<any[]>([]);
 
-    // Payslips state
-    const [payslips, setPayslips] = useState<any[]>([]);
+    // Add Employee Modal
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [form, setForm] = useState({ name: '', hours: '', holidays: '', notes: '' });
 
-    // Liabilities state
-    const [liabilities, setLiabilities] = useState<any[]>([]);
-
-    // Starter Form state
-    const [starterForm, setStarterForm] = useState<any>(null);
-
-    // P60/P45 state
-    const [p60p45s, setP60p45s] = useState<any[]>([]);
-    const [selectedP60Year, setSelectedP60Year] = useState('2024/2025');
+    // PDF Viewer Modal
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [pdfTitle, setPdfTitle] = useState('');
 
     useEffect(() => {
-        loadTabData();
-    }, [activeTab, selectedYear, selectedP60Year]);
+        loadSubmissions();
+    }, [selectedYear, selectedMonth]);
 
-    const loadTabData = async () => {
+    const loadSubmissions = async () => {
         setLoading(true);
         try {
-            switch (activeTab) {
-                case 0:
-                    const subRes = await api.get(`/payroll/submissions?year=${selectedYear}`);
-                    setSubmissions(subRes.data);
-                    break;
-                case 1:
-                    const payRes = await api.get(`/payroll/payslips?year=${selectedYear}`);
-                    setPayslips(payRes.data);
-                    break;
-                case 2:
-                    const liabRes = await api.get(`/payroll/liabilities?year=${selectedYear}`);
-                    setLiabilities(liabRes.data);
-                    break;
-                case 3:
-                    const formRes = await api.get('/payroll/starter-form');
-                    setStarterForm(formRes.data);
-                    break;
-                case 4:
-                    const p60Res = await api.get(`/payroll/p60-p45?tax_year=${selectedP60Year}`);
-                    setP60p45s(p60Res.data);
-                    break;
-            }
+            const response = await api.get(`/payroll/submissions?year=${selectedYear}&month=${selectedMonth}`);
+            setSubmissions(response.data);
         } catch (error) {
-            console.log('Error loading payroll data:', error);
+            console.log(error);
+            Alert.alert('Error', 'Failed to load employees');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSubmitHours = async () => {
+    const handleAddEmployee = async () => {
+        if (!form.name || !form.hours) {
+            Alert.alert('Missing Fields', 'Please enter Name and Hours');
+            return;
+        }
+
         try {
             await api.post('/payroll/submissions', {
-                month: selectedMonth,
                 year: selectedYear,
-                ...submitForm,
+                month: selectedMonth,
+                name: form.name,
+                hours: form.hours,
+                holidays: form.holidays,
+                notes: form.notes,
             });
-            Alert.alert('Success', 'Payroll hours submitted successfully');
-            setShowSubmitModal(false);
-            setSubmitForm({ name: '', hours: '', holidays: '', notes: '' });
-            loadTabData();
+            setShowAddModal(false);
+            setForm({ name: '', hours: '', holidays: '', notes: '' });
+            loadSubmissions();
+            Alert.alert('Success', 'Employee added successfully');
         } catch (error) {
-            Alert.alert('Error', 'Failed to submit payroll hours');
+            console.log(error);
+            Alert.alert('Error', 'Failed to add employee');
         }
     };
 
-    const openMonthSubmit = (month: string) => {
-        setSelectedMonth(month);
-        setShowSubmitModal(true);
+    const getBaseUrl = () => {
+        return API_URL.replace('/api', '');
     };
 
-    const renderSubmitHours = () => (
-        <View>
-            <Text style={styles.tabDescription}>Submit payroll hours for each month</Text>
-            {MONTHS.map((month) => {
-                const submitted = submissions.find((s) => s.month === month);
-                return (
-                    <TouchableOpacity
-                        key={month}
-                        style={styles.monthCard}
-                        onPress={() => openMonthSubmit(month)}
-                    >
-                        <View style={styles.monthInfo}>
-                            <Ionicons
-                                name={submitted ? 'checkmark-circle' : 'ellipse-outline'}
-                                size={20}
-                                color={submitted ? '#10b981' : '#64748b'}
-                            />
-                            <Text style={styles.monthText}>{month}</Text>
-                        </View>
-                        <View style={styles.monthRight}>
-                            {submitted && <Text style={styles.submittedText}>Submitted</Text>}
-                            <Ionicons name="chevron-forward" size={18} color="#64748b" />
-                        </View>
-                    </TouchableOpacity>
-                );
-            })}
-        </View>
-    );
+    const handleViewPdf = (path: string, title: string) => {
+        if (!path) return;
+        const fullUrl = path.startsWith('http') ? path : `${getBaseUrl()}${path}`;
+        setPdfUrl(fullUrl);
+        setPdfTitle(title);
+        setShowPdfModal(true);
+    };
 
-    const renderPayslips = () => (
-        <View>
-            <Text style={styles.tabDescription}>View and download payslips</Text>
-            {MONTHS.map((month) => {
-                const payslip = payslips.find((p) => p.month === month);
-                return (
-                    <View key={month} style={styles.monthCard}>
-                        <View style={styles.monthInfo}>
-                            <Ionicons
-                                name={payslip ? 'document-text' : 'document-text-outline'}
-                                size={20}
-                                color={payslip ? '#3b82f6' : '#475569'}
-                            />
-                            <Text style={styles.monthText}>{month}</Text>
-                        </View>
-                        {payslip ? (
-                            <TouchableOpacity
-                                style={styles.downloadBtn}
-                                onPress={() => Linking.openURL(payslip.file_path)}
-                            >
-                                <Ionicons name="download-outline" size={16} color="#14b8a6" />
-                                <Text style={styles.downloadText}>Download</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <Text style={styles.notAvailableText}>Not available</Text>
-                        )}
-                    </View>
-                );
-            })}
-        </View>
-    );
+    const downloadPdf = async () => {
+        if (!pdfUrl) return;
 
-    const renderLiabilities = () => (
-        <View>
-            <Text style={styles.tabDescription}>Monthly payroll liabilities and payment info</Text>
-            {MONTHS.map((month) => {
-                const liability = liabilities.find((l) => l.month === month);
-                return (
-                    <View key={month} style={styles.liabilityCard}>
-                        <View style={styles.liabilityHeader}>
-                            <Text style={styles.monthText}>{month}</Text>
-                            {liability && (
-                                <Text style={styles.amountText}>£{parseFloat(liability.amount).toFixed(2)}</Text>
-                            )}
-                        </View>
-                        {liability ? (
-                            <View style={styles.liabilityDetails}>
-                                {liability.payment_reference && (
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>Payment Ref:</Text>
-                                        <Text style={styles.detailValue}>{liability.payment_reference}</Text>
-                                    </View>
-                                )}
-                                {liability.payment_link && (
-                                    <TouchableOpacity
-                                        style={styles.payBtn}
-                                        onPress={() => Linking.openURL(liability.payment_link)}
-                                    >
-                                        <Ionicons name="card-outline" size={16} color="#fff" />
-                                        <Text style={styles.payBtnText}>Pay Now</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        ) : (
-                            <Text style={styles.notAvailableText}>No liability set</Text>
-                        )}
-                    </View>
-                );
-            })}
-        </View>
-    );
+        try {
+            const filename = pdfUrl.split('/').pop() || 'document.pdf';
+            const fileUri = `${FileSystem.documentDirectory}${filename}`;
 
-    const renderStarterForm = () => (
-        <View>
-            <Text style={styles.tabDescription}>View and download the starter form</Text>
-            {starterForm ? (
-                <View style={styles.starterCard}>
-                    <View style={styles.starterInfo}>
-                        <LinearGradient colors={['#3b82f6', '#14b8a6']} style={styles.starterIcon}>
-                            <Ionicons name="document-text" size={28} color="#fff" />
-                        </LinearGradient>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.starterTitle}>Starter Form</Text>
-                            <Text style={styles.starterFilename}>{starterForm.filename || 'starter_form.pdf'}</Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.downloadFullBtn}
-                        onPress={() => Linking.openURL(starterForm.file_path)}
-                    >
-                        <Ionicons name="download-outline" size={18} color="#fff" />
-                        <Text style={styles.downloadFullText}>Download Form</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="document-outline" size={48} color="#475569" />
-                    <Text style={styles.emptyText}>No starter form available</Text>
-                    <Text style={styles.emptySubtext}>Your accountant will upload it here</Text>
-                </View>
-            )}
+            const downloadRes = await FileSystem.downloadAsync(pdfUrl, fileUri);
 
-            {/* Upload button */}
-            <TouchableOpacity style={styles.uploadArea}>
-                <Ionicons name="cloud-upload-outline" size={24} color="#3b82f6" />
-                <Text style={styles.uploadAreaText}>Upload Starter Form</Text>
-            </TouchableOpacity>
-        </View>
-    );
-
-    const renderP60P45 = () => (
-        <View>
-            <Text style={styles.tabDescription}>View and download P60s and P45s</Text>
-
-            {/* Year Selector */}
-            <View style={styles.yearSelector}>
-                {TAX_YEARS_P60.map((year) => (
-                    <TouchableOpacity
-                        key={year}
-                        style={[styles.yearChip, selectedP60Year === year && styles.yearChipActive]}
-                        onPress={() => setSelectedP60Year(year)}
-                    >
-                        <Text style={[styles.yearChipText, selectedP60Year === year && styles.yearChipTextActive]}>
-                            {year}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {p60p45s.length > 0 ? (
-                p60p45s.map((doc) => (
-                    <View key={doc.id} style={styles.monthCard}>
-                        <View style={styles.monthInfo}>
-                            <Ionicons name="document-text" size={20} color="#8b5cf6" />
-                            <View>
-                                <Text style={styles.monthText}>{doc.type.toUpperCase()}</Text>
-                                <Text style={styles.notAvailableText}>{doc.tax_year}</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.downloadBtn}
-                            onPress={() => Linking.openURL(doc.file_path)}
-                        >
-                            <Ionicons name="download-outline" size={16} color="#14b8a6" />
-                            <Text style={styles.downloadText}>Download</Text>
-                        </TouchableOpacity>
-                    </View>
-                ))
-            ) : (
-                <View style={styles.emptyState}>
-                    <Ionicons name="folder-open-outline" size={48} color="#475569" />
-                    <Text style={styles.emptyText}>No documents for {selectedP60Year}</Text>
-                </View>
-            )}
-        </View>
-    );
-
-    const tabContent = [renderSubmitHours, renderPayslips, renderLiabilities, renderStarterForm, renderP60P45];
+            if (Platform.OS === 'android') {
+                const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                if (permissions.granted) {
+                    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, { encoding: FileSystem.EncodingType.Base64 });
+                    await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'application/pdf')
+                        .then(async (uri: string) => {
+                            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+                            Alert.alert('Success', 'File saved to device');
+                        })
+                        .catch((e: any) => console.log(e));
+                } else {
+                    Sharing.shareAsync(downloadRes.uri);
+                }
+            } else {
+                Sharing.shareAsync(downloadRes.uri);
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Failed to download file');
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -306,91 +140,182 @@ export default function PayrollScreen() {
                     <View style={{ width: 40 }} />
                 </View>
 
-                {/* Tabs */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar}>
-                    {TABS.map((tab, i) => (
-                        <TouchableOpacity
-                            key={tab}
-                            style={[styles.tab, activeTab === i && styles.tabActive]}
-                            onPress={() => setActiveTab(i)}
-                        >
-                            <Text style={[styles.tabText, activeTab === i && styles.tabTextActive]}>{tab}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+                {/* Filter / Month Selector */}
+                <View style={styles.filterSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthSelector}>
+                        {MONTHS.map(m => (
+                            <TouchableOpacity
+                                key={m}
+                                style={[styles.monthChip, selectedMonth === m && styles.monthChipActive]}
+                                onPress={() => setSelectedMonth(m)}
+                            >
+                                <Text style={[styles.monthChipText, selectedMonth === m && styles.monthChipTextActive]}>{m}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
 
-                {/* Content */}
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+                <View style={styles.contentHeader}>
+                    <Text style={styles.sectionTitle}>Employee List ({selectedMonth})</Text>
+
+                    {/* Add Employee Button */}
+                    <TouchableOpacity
+                        style={styles.addBtn}
+                        onPress={() => setShowAddModal(true)}
+                    >
+                        <LinearGradient
+                            colors={['#3b82f6', '#14b8a6']}
+                            style={styles.addBtnGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            <Ionicons name="add" size={20} color="#fff" />
+                            <Text style={styles.addBtnText}>Add Employee</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Employee List */}
+                <ScrollView contentContainerStyle={styles.listContent}>
                     {loading ? (
                         <ActivityIndicator size="large" color="#14b8a6" style={{ marginTop: 40 }} />
+                    ) : submissions.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="people-outline" size={48} color="#475569" />
+                            <Text style={styles.emptyText}>No employees added for this month.</Text>
+                        </View>
                     ) : (
-                        tabContent[activeTab]()
+                        <View style={styles.gridContainer}>
+                            {submissions.map((item) => (
+                                <View key={item.id} style={styles.card}>
+                                    <View style={styles.cardHeader}>
+                                        <Text style={styles.cardName}>{item.name}</Text>
+
+                                        {/* Status / Action Icons */}
+                                        <View style={styles.cardActions}>
+                                            {item.status === 'processed' && item.payslip_file_path ? (
+                                                <TouchableOpacity onPress={() => handleViewPdf(item.payslip_file_path, `${item.name} - ${item.month}`)}>
+                                                    <View style={styles.iconBadge}>
+                                                        <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+                                                        <Ionicons name="eye-outline" size={18} color="#3b82f6" style={{ marginLeft: 4 }} />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            ) : item.status === 'processing' ? (
+                                                <View style={styles.statusContainer}>
+                                                    <ActivityIndicator size="small" color="#f59e0b" />
+                                                </View>
+                                            ) : (
+                                                <Ionicons name="cloud-upload-outline" size={20} color="#64748b" />
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.cardDetails}>
+                                        <Text style={styles.detailText}>Hours Worked: <Text style={styles.detailValue}>{item.hours}</Text></Text>
+                                        <Text style={styles.detailText}>Holidays: <Text style={styles.detailValue}>{item.holidays || '0'}</Text></Text>
+                                        {item.notes ? (
+                                            <Text style={styles.detailText} numberOfLines={1}>Note: <Text style={styles.detailValue}>{item.notes}</Text></Text>
+                                        ) : null}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
                     )}
-                    <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
 
-            {/* Submit Hours Modal */}
-            <Modal visible={showSubmitModal} animationType="slide" transparent>
+            {/* Add Employee Modal */}
+            <Modal visible={showAddModal} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <LinearGradient colors={['#1e293b', '#0f172a']} style={styles.modalGradient}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Submit Hours — {selectedMonth}</Text>
-                                <TouchableOpacity onPress={() => setShowSubmitModal(false)}>
+                                <Text style={styles.modalTitle}>Add Employee</Text>
+                                <TouchableOpacity onPress={() => setShowAddModal(false)}>
                                     <Ionicons name="close" size={24} color="#64748b" />
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.modalDescription}>
-                                Please submit the name, hours, holidays and any other notes in the box below
-                            </Text>
-
                             <TextInput
-                                style={styles.modalInput}
+                                style={styles.input}
                                 placeholder="Employee Name"
                                 placeholderTextColor="#475569"
-                                value={submitForm.name}
-                                onChangeText={(t) => setSubmitForm({ ...submitForm, name: t })}
+                                value={form.name}
+                                onChangeText={t => setForm({ ...form, name: t })}
                             />
+                            <View style={styles.row}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1, marginRight: 8 }]}
+                                    placeholder="Hours"
+                                    placeholderTextColor="#475569"
+                                    keyboardType="numeric"
+                                    value={form.hours}
+                                    onChangeText={t => setForm({ ...form, hours: t })}
+                                />
+                                <TextInput
+                                    style={[styles.input, { flex: 1, marginLeft: 8 }]}
+                                    placeholder="Holidays"
+                                    placeholderTextColor="#475569"
+                                    keyboardType="numeric"
+                                    value={form.holidays}
+                                    onChangeText={t => setForm({ ...form, holidays: t })}
+                                />
+                            </View>
                             <TextInput
-                                style={styles.modalInput}
-                                placeholder="Hours Worked"
-                                placeholderTextColor="#475569"
-                                keyboardType="numeric"
-                                value={submitForm.hours}
-                                onChangeText={(t) => setSubmitForm({ ...submitForm, hours: t })}
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                placeholder="Holiday Hours"
-                                placeholderTextColor="#475569"
-                                keyboardType="numeric"
-                                value={submitForm.holidays}
-                                onChangeText={(t) => setSubmitForm({ ...submitForm, holidays: t })}
-                            />
-                            <TextInput
-                                style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]}
-                                placeholder="Additional Notes"
+                                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                                placeholder="Notes"
                                 placeholderTextColor="#475569"
                                 multiline
-                                value={submitForm.notes}
-                                onChangeText={(t) => setSubmitForm({ ...submitForm, notes: t })}
+                                value={form.notes}
+                                onChangeText={t => setForm({ ...form, notes: t })}
                             />
 
-                            <TouchableOpacity onPress={handleSubmitHours} style={styles.submitBtnContainer}>
+                            <TouchableOpacity onPress={handleAddEmployee} style={styles.submitBtn}>
                                 <LinearGradient
                                     colors={['#3b82f6', '#14b8a6']}
-                                    style={styles.submitBtn}
+                                    style={styles.submitBtnGradient}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                 >
-                                    <Text style={styles.submitBtnText}>Submit Hours</Text>
+                                    <Text style={styles.submitBtnText}>Add Employee</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
                         </LinearGradient>
                     </View>
                 </View>
+            </Modal>
+
+            {/* PDF Viewer Modal */}
+            <Modal visible={showPdfModal} animationType="slide" onRequestClose={() => setShowPdfModal(false)}>
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                    <View style={styles.pdfHeader}>
+                        <TouchableOpacity onPress={() => setShowPdfModal(false)} style={styles.backBtn}>
+                            <Ionicons name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={styles.pdfTitle} numberOfLines={1}>{pdfTitle}</Text>
+                        <TouchableOpacity onPress={downloadPdf} style={styles.backBtn}>
+                            <Ionicons name="download-outline" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                    {pdfUrl && (
+                        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+                            {Platform.OS === 'android' ? (
+                                <WebView
+                                    source={{ uri: `https://docs.google.com/gview?embedded=true&url=${pdfUrl}` }}
+                                    style={{ flex: 1 }}
+                                    startInLoadingState
+                                    renderLoading={() => <ActivityIndicator style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} />}
+                                />
+                            ) : (
+                                <WebView
+                                    source={{ uri: pdfUrl }}
+                                    style={{ flex: 1 }}
+                                    startInLoadingState
+                                />
+                            )}
+                        </View>
+                    )}
+                </SafeAreaView>
             </Modal>
         </View>
     );
@@ -409,106 +334,68 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-    tabBar: { maxHeight: 48, paddingHorizontal: 16, marginBottom: 8 },
-    tab: {
-        paddingHorizontal: 16, paddingVertical: 10, marginRight: 8,
-        borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)',
+    filterSection: { marginBottom: 16 },
+    monthSelector: { paddingHorizontal: 16, maxHeight: 40 },
+    monthChip: {
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 8,
     },
-    tabActive: { backgroundColor: '#14b8a6' },
-    tabText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-    tabTextActive: { color: '#fff' },
-    content: { paddingHorizontal: 20 },
-    tabDescription: { fontSize: 13, color: '#94a3b8', marginBottom: 16 },
-    monthCard: {
+    monthChipActive: { backgroundColor: '#14b8a6' },
+    monthChipText: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
+    monthChipTextActive: { color: '#fff' },
+    contentHeader: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12,
-        padding: 14, marginBottom: 8,
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+        paddingHorizontal: 20, marginBottom: 12,
     },
-    monthInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    monthText: { fontSize: 15, fontWeight: '500', color: '#e2e8f0' },
-    monthRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    submittedText: { fontSize: 12, color: '#10b981', fontWeight: '600' },
-    notAvailableText: { fontSize: 12, color: '#475569' },
-    downloadBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        paddingHorizontal: 12, paddingVertical: 6,
-        borderRadius: 8, backgroundColor: 'rgba(20, 184, 166, 0.1)',
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#e2e8f0' },
+    addBtn: { borderRadius: 8, overflow: 'hidden' },
+    addBtnGradient: {
+        flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, gap: 6,
     },
-    downloadText: { fontSize: 12, fontWeight: '600', color: '#14b8a6' },
-    liabilityCard: {
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12,
-        padding: 14, marginBottom: 10,
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    },
-    liabilityHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    addBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+    gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    card: {
+        width: '48%', // 2 columns roughly
+        backgroundColor: '#e0f2fe', // sky-100 equivalent for that light blue look in screenshot
+        borderRadius: 12,
+        padding: 12,
         marginBottom: 8,
     },
-    amountText: { fontSize: 18, fontWeight: 'bold', color: '#14b8a6' },
-    liabilityDetails: { gap: 8 },
-    detailRow: { flexDirection: 'row', gap: 8 },
-    detailLabel: { fontSize: 12, color: '#64748b' },
-    detailValue: { fontSize: 12, color: '#e2e8f0', fontWeight: '600' },
-    payBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 6, backgroundColor: '#3b82f6', borderRadius: 8, paddingVertical: 10,
+    cardHeader: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+        marginBottom: 8,
     },
-    payBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-    starterCard: {
-        backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16,
-        padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-        marginBottom: 16,
-    },
-    starterInfo: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
-    starterIcon: {
-        width: 56, height: 56, borderRadius: 16,
-        justifyContent: 'center', alignItems: 'center',
-    },
-    starterTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-    starterFilename: { fontSize: 13, color: '#64748b', marginTop: 4 },
-    downloadFullBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, backgroundColor: '#14b8a6', borderRadius: 10, paddingVertical: 12,
-    },
-    downloadFullText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-    uploadArea: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, borderRadius: 12, paddingVertical: 16,
-        borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)', borderStyle: 'dashed',
-        backgroundColor: 'rgba(59, 130, 246, 0.05)',
-    },
-    uploadAreaText: { fontSize: 14, fontWeight: '600', color: '#3b82f6' },
-    yearSelector: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-    yearChip: {
-        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-    },
-    yearChipActive: { backgroundColor: '#8b5cf6' },
-    yearChipText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-    yearChipTextActive: { color: '#fff' },
-    emptyState: { alignItems: 'center', paddingVertical: 40 },
-    emptyText: { fontSize: 16, fontWeight: '600', color: '#94a3b8', marginTop: 12 },
-    emptySubtext: { fontSize: 13, color: '#64748b', marginTop: 4 },
-    modalOverlay: {
-        flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)',
-    },
+    cardName: { fontSize: 14, fontWeight: 'bold', color: '#0f172a', flex: 1, marginRight: 4 },
+    cardActions: { alignItems: 'flex-end' },
+    statusContainer: { padding: 2 },
+    iconBadge: { flexDirection: 'row', alignItems: 'center' },
+    cardDetails: { gap: 2 },
+    detailText: { fontSize: 12, color: '#334155' },
+    detailValue: { fontWeight: '600', color: '#0f172a' },
+    emptyState: { alignItems: 'center', paddingTop: 40 },
+    emptyText: { color: '#64748b', marginTop: 12 },
+
+    // Modal
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
     modalGradient: { padding: 24, paddingBottom: 40 },
-    modalHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 12,
-    },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
-    modalDescription: { fontSize: 13, color: '#94a3b8', marginBottom: 20, lineHeight: 20 },
-    modalInput: {
+    input: {
         backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12,
         paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: '#fff',
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 12,
     },
-    submitBtnContainer: { marginTop: 8, borderRadius: 12, overflow: 'hidden' },
-    submitBtn: {
-        alignItems: 'center', justifyContent: 'center', paddingVertical: 16,
+    row: { flexDirection: 'row' },
+    submitBtn: { borderRadius: 12, overflow: 'hidden', marginTop: 8 },
+    submitBtnGradient: { alignItems: 'center', paddingVertical: 16 },
+    submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
+    // PDF Viewer
+    pdfHeader: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)'
     },
-    submitBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+    pdfTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1, textAlign: 'center', marginHorizontal: 10 },
 });

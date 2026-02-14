@@ -63,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Payroll - Submissions
     Route::get('/payroll/submissions', [\App\Http\Controllers\Api\PayrollController::class, 'getSubmissions']);
     Route::post('/payroll/submissions', [\App\Http\Controllers\Api\PayrollController::class, 'submitHours']);
+    Route::post('/payroll/submissions/{id}/payslip', [\App\Http\Controllers\Api\PayrollController::class, 'uploadEmployeePayslip']);
 
     // Payroll - Payslips
     Route::get('/payroll/payslips', [\App\Http\Controllers\Api\PayrollController::class, 'getPayslips']);

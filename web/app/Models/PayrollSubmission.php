@@ -16,6 +16,8 @@ class PayrollSubmission extends Model
         'holidays',
         'notes',
         'status',
+        'payslip_file_path',
+        'payslip_filename',
     ];
 
     public function user(): BelongsTo

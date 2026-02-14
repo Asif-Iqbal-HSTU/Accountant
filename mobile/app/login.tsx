@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -24,6 +24,24 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Check for stored token on mount (Remember Me)
+    useEffect(() => {
+        checkLogin();
+    }, []);
+
+    const checkLogin = async () => {
+        try {
+            const token = await SecureStore.getItemAsync('token');
+            if (token) {
+                // Verify token validity essentially by just trying to fetch user or relying on stored user
+                // Ideally we'd hit /user endpoint, but for speed we can just trust stored token + 401 interceptor
+                router.replace('/(tabs)');
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
+
     const handleLogin = async () => {
         if (!email || !password) {
             Alert.alert('Error', 'Please enter email and password');
@@ -35,6 +53,8 @@ export default function Login() {
             const response = await api.post('/login', { email, password });
             await SecureStore.setItemAsync('token', response.data.access_token);
             await SecureStore.setItemAsync('user', JSON.stringify(response.data.user));
+
+            // Navigate to main app
             router.replace('/(tabs)');
         } catch (error: any) {
             console.log(error);
@@ -62,13 +82,7 @@ export default function Login() {
                     style={styles.keyboardView}
                 >
                     <View style={styles.content}>
-                        {/* Back button */}
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            style={styles.backButton}
-                        >
-                            <Ionicons name="arrow-back" size={24} color="#fff" />
-                        </TouchableOpacity>
+                        {/* No Back button on Login screen generally, but kept if navigating from somewhere else */}
 
                         {/* Logo */}
                         <View style={styles.logoContainer}>
@@ -151,9 +165,9 @@ export default function Login() {
                                 <View style={styles.dividerLine} />
                             </View>
 
-                            {/* Setup link */}
+                            {/* Setup link -> Register */}
                             <TouchableOpacity
-                                onPress={() => router.push('/setup')}
+                                onPress={() => router.push('/register')}
                                 style={styles.setupButton}
                             >
                                 <Text style={styles.setupButtonText}>Create new account</Text>

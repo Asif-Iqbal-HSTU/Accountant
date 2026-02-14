@@ -8,6 +8,7 @@ import {
     RefreshControl,
     StatusBar,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +51,7 @@ export default function MessagesScreen() {
             }
         } catch (error) {
             console.log(error);
+            Alert.alert('Connection Error', 'Failed to load messages. Please ensure the server is running and accessible.');
         } finally {
             setLoading(false);
             setRefreshing(false);

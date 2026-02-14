@@ -26,6 +26,7 @@ class SearchController extends Controller
     public function searchClients(Request $request)
     {
         $query = User::where('role', 'client')
+            ->with('companyInfo')
             ->withCount(['sentMessages as unread_count' => function ($q) {
                 $q->where('receiver_id', \Illuminate\Support\Facades\Auth::id())
                   ->whereNull('read_at');

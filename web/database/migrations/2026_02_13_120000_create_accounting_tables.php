@@ -34,6 +34,8 @@ return new class extends Migration {
             $table->string('holidays')->nullable();
             $table->text('notes')->nullable();
             $table->enum('status', ['pending', 'processed'])->default('pending');
+            $table->string('payslip_file_path')->nullable();
+            $table->string('payslip_filename')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'year', 'month']);

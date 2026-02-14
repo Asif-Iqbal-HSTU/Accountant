@@ -1,10 +1,12 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Editor, EditorProvider, Toolbar, BtnBold, BtnItalic, BtnUnderline, BtnStrikeThrough, BtnLink, BtnBulletList, BtnNumberedList, BtnClearFormatting, Separator } from 'react-simple-wysiwyg';
-import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, Send, MessageSquare, Users, Building2 } from 'lucide-react';
+import { Paperclip, Mic, Square, Trash2, ArrowDown, Reply, Star, Check, CheckCheck, Search, X, Archive, Calendar, Filter, Send, MessageSquare, Users, Building2, Plus, Edit, PoundSterling } from 'lucide-react';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import CompanyInfoForm from '@/components/accounting/company-info-form';
 
 axios.defaults.withCredentials = true;
 
@@ -33,6 +35,20 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     const [partnerTyping, setPartnerTyping] = useState(false);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+    // New state for Company Info Modal
+    const [editingCompanyInfoClientId, setEditingCompanyInfoClientId] = useState<number | null>(null);
+    const [viewingChatClientId, setViewingChatClientId] = useState<number | null>(null);
+
+    // If viewing chat, set selected client to that ID
+    useEffect(() => {
+        if (viewingChatClientId) {
+            const client = clientsData.find(c => c.id === viewingChatClientId);
+            if (client) setSelectedClient(client);
+        } else {
+            setSelectedClient(null);
+        }
+    }, [viewingChatClientId, clientsData]);
 
     // Helper to strip HTML tags for plain text preview
     const stripHtml = (html: string | null) => {
@@ -66,19 +82,21 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     };
 
     // Poll for client list updates (for unread badges)
+    const fetchClients = useCallback(async () => {
+        try {
+            const endpoint = user.role === 'accountant' ? '/api/clients' : '/api/accountants';
+            const response = await axios.get(endpoint);
+            setClientsData(response.data);
+        } catch (error) {
+            console.error(error);
+        }
+    }, [user.role]);
+
     useEffect(() => {
-        const fetchClients = async () => {
-            try {
-                const endpoint = user.role === 'accountant' ? '/api/clients' : '/api/accountants';
-                const response = await axios.get(endpoint);
-                setClientsData(response.data);
-            } catch (error) {
-                console.error(error);
-            }
-        };
+        fetchClients();
         const interval = setInterval(fetchClients, 10000);
         return () => clearInterval(interval);
-    }, [user.role]);
+    }, [fetchClients]);
 
     const filteredClients = clientsData.filter(client =>
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -286,21 +304,166 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
     };
 
 
+    if (user.role === 'accountant' && !viewingChatClientId) {
+        return (
+            <AppLayout breadcrumbs={[{ title: 'Dashboard', href: dashboard().url }]}>
+                <Head title="Dashboard" />
+                <div className="p-6 bg-slate-50 dark:bg-slate-900 min-h-screen">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clients</h1>
+                            <p className="text-slate-500">Manage your clients and their company information</p>
+                        </div>
+                        <div className="relative w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search clients..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {filteredClients.map(client => (
+                            <div key={client.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+                                <div className="p-6 flex items-start justify-between border-b border-slate-100 dark:border-slate-700/50">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getAvatarClasses(client.name)} flex items-center justify-center font-bold text-white text-lg shadow-lg`}>
+                                            {getInitials(client.name)}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-slate-900 dark:text-white">{client.name}</h3>
+                                            <p className="text-sm text-slate-500">{client.email}</p>
+                                        </div>
+                                    </div>
+                                    {client.unread_count > 0 && (
+                                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                            {client.unread_count} new
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="p-6 flex-1">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                                            <Building2 className="w-4 h-4 text-blue-500" />
+                                            <span className="font-medium">Company Info:</span>
+                                        </div>
+
+                                        {/* We need to fetch company info for each client or have it included. 
+                                            Assuming for now we might load it on demand or check if it exists if provided in prop.
+                                            Ideally 'clients' prop should include 'company_info'. 
+                                        */}
+                                        {client.company_info ? (
+                                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 space-y-2 border border-slate-100 dark:border-slate-700">
+                                                <div className="flex justify-between">
+                                                    <span className="text-xs text-slate-500">Company Name/Number</span>
+                                                    <span className="text-xs font-medium text-slate-900 dark:text-white">{client.company_info.company_number || 'N/A'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-xs text-slate-500">VAT Reg</span>
+                                                    <span className="text-xs font-medium text-slate-900 dark:text-white">{client.company_info.vat_registration || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 text-center border border-dashed border-slate-300 dark:border-slate-600">
+                                                <p className="text-sm text-slate-500 mb-2">No company info added</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex gap-2">
+                                            <Dialog open={editingCompanyInfoClientId === client.id} onOpenChange={(open) => setEditingCompanyInfoClientId(open ? client.id : null)}>
+                                                <DialogTrigger asChild>
+                                                    <button className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-medium transition-colors">
+                                                        {client.company_info ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                                        {client.company_info ? 'Edit Info' : 'Add Info'}
+                                                    </button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-[600px]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Company Information - {client.name}</DialogTitle>
+                                                        <DialogDescription>
+                                                            Update company registration details for this client.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <CompanyInfoForm
+                                                        userId={client.id}
+                                                        initialData={client.company_info} // Pass existing data if any
+                                                        onSuccess={() => {
+                                                            setEditingCompanyInfoClientId(null);
+                                                            fetchClients();
+                                                        }}
+                                                    />
+                                                </DialogContent>
+                                            </Dialog>
+
+                                            <button
+                                                onClick={() => setViewingChatClientId(client.id)}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                <MessageSquare className="w-4 h-4" />
+                                                Message
+                                            </button>
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <Link
+                                                href={`/clients/${client.id}/accounting/payroll`}
+                                                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                <PoundSterling className="w-4 h-4" />
+                                                Manage Payroll
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    // Existing Chat View Logic with 'Back' button added
     return (
         <AppLayout breadcrumbs={[{ title: 'Dashboard', href: dashboard().url }]}>
             <Head title="Dashboard" />
             <div className="flex h-[calc(100vh-65px)] p-4 gap-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-                {/* Client List */}
-                <div className="w-80 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl">
-                    {/* Header */}
+                {/* Client List - Hidden on mobile or if viewing specific chat in accountant view 
+                    Actually, if we are in 'chat view' mode for accountant, maybe we show just the chat or the siderbar + chat?
+                    Let's revert to original sidebar + chat layout if viewingChatClientId is set, 
+                    OR if user is client (who only sees chat).
+                */}
+
+                {/* Back Button for Accountant */}
+                {user.role === 'accountant' && viewingChatClientId && (
+                    <div className="absolute top-20 left-4 z-10 md:hidden">
+                        <button onClick={() => setViewingChatClientId(null)} className="p-2 bg-white shadow rounded-full">
+                            <ArrowDown className="rotate-90" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Client List Sidebar */}
+                <div className={`w-80 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl ${viewingChatClientId ? 'hidden md:flex' : 'flex'}`}>
                     <div className="p-5 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-500/5 to-teal-500/5">
                         <div className="flex items-center gap-3 mb-4">
+                            {user.role === 'accountant' && (
+                                <button onClick={() => setViewingChatClientId(null)} className="md:hidden mr-2">
+                                    <ArrowDown className="h-5 w-5 rotate-90" />
+                                </button>
+                            )}
+                            {/* ... existing header content ... */}
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center shadow-lg shadow-blue-500/25">
                                 <Users className="h-5 w-5 text-white" />
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">Clients</h2>
-                                <p className="text-xs text-slate-500">{filteredClients.length} total</p>
+                                {user.role === 'accountant' && <button onClick={() => setViewingChatClientId(null)} className="text-xs text-blue-500 hover:underline">Back to grid</button>}
                             </div>
                         </div>
 
@@ -317,30 +480,29 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                             </div>
                         )}
                     </div>
-
-                    {/* Client List */}
+                    {/* Client List Content */}
                     <div className="flex-1 overflow-y-auto p-3">
                         {user.role === 'client' ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-4">
                                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-teal-500/10 flex items-center justify-center mb-4">
                                     <MessageSquare className="h-8 w-8 text-blue-500" />
                                 </div>
-                                <p className="text-slate-500 text-sm">Search accountants on your mobile app.</p>
+                                <p className="text-slate-500 text-sm">Contact your accountant using the chat.</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
                                 {filteredClients.map(client => (
                                     <button
                                         key={client.id}
-                                        onClick={() => setSelectedClient(client)}
+                                        onClick={() => { setSelectedClient(client); setViewingChatClientId(client.id); }}
                                         className={`w-full p-3 rounded-xl transition-all duration-200 flex items-center gap-3 text-left group ${selectedClient?.id === client.id
-                                                ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg shadow-blue-500/25'
-                                                : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                                            ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg shadow-blue-500/25'
+                                            : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
                                             }`}
                                     >
                                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm ${selectedClient?.id === client.id
-                                                ? 'bg-white/20'
-                                                : `bg-gradient-to-br ${getAvatarClasses(client.name)} text-white shadow-md`
+                                            ? 'bg-white/20'
+                                            : `bg-gradient-to-br ${getAvatarClasses(client.name)} text-white shadow-md`
                                             }`}>
                                             {getInitials(client.name)}
                                         </div>
@@ -354,29 +516,21 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         </div>
                                         {client.unread_count > 0 && (
                                             <div className={`min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs font-bold ${selectedClient?.id === client.id
-                                                    ? 'bg-white text-blue-500'
-                                                    : 'bg-red-500 text-white'
+                                                ? 'bg-white text-blue-500'
+                                                : 'bg-red-500 text-white'
                                                 }`}>
                                                 {client.unread_count}
                                             </div>
                                         )}
                                     </button>
                                 ))}
-                                {clients.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                                        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mb-4">
-                                            <Users className="h-8 w-8 text-slate-400" />
-                                        </div>
-                                        <p className="text-slate-500 text-sm">No clients found.</p>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Chat Area */}
-                <div className="flex-1 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl">
+                <div className={`flex-1 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col overflow-hidden backdrop-blur-xl ${viewingChatClientId || user.role === 'client' ? 'flex' : 'hidden md:flex'}`}>
                     {selectedClient ? (
                         <>
                             {/* Chat Header */}
@@ -473,8 +627,8 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                         className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'} transition-all duration-300 ${highlightedMessageId === msg.id ? 'scale-[1.02]' : ''}`}
                                     >
                                         <div className={`max-w-lg rounded-2xl p-4 transition-all duration-300 ${msg.sender_id === user.id
-                                                ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-br-md shadow-lg shadow-blue-500/20'
-                                                : 'bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white rounded-bl-md shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-700/50'
+                                            ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded-br-md shadow-lg shadow-blue-500/20'
+                                            : 'bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white rounded-bl-md shadow-lg shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-700/50'
                                             } ${highlightedMessageId === msg.id ? 'ring-2 ring-yellow-400' : ''}`}>
                                             {msg.parent && (
                                                 <div
@@ -487,8 +641,8 @@ export default function Dashboard({ clients = [] }: { clients?: any[] }) {
                                                         }
                                                     }}
                                                     className={`text-xs mb-3 p-2 rounded-lg border-l-2 cursor-pointer transition-all hover:opacity-80 ${msg.sender_id === user.id
-                                                            ? 'bg-white/10 border-white/50'
-                                                            : 'bg-slate-100 dark:bg-slate-600/50 border-slate-300 dark:border-slate-500'
+                                                        ? 'bg-white/10 border-white/50'
+                                                        : 'bg-slate-100 dark:bg-slate-600/50 border-slate-300 dark:border-slate-500'
                                                         }`}
                                                 >
                                                     <div className="font-semibold flex items-center gap-1"><Reply className="h-3 w-3" /> Reply</div>

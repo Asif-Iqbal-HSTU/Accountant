@@ -24,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import api from '../../services/api';
+import api, { API_URL } from '../../services/api';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 
 // Defined types to avoid TS errors
@@ -372,7 +372,7 @@ export default function ChatScreen() {
 
     const renderMessageContent = (item: Message, isMyMessage: boolean) => {
         const textColor = isMyMessage ? '#fff' : '#333';
-        const baseUrl = 'http://103.7.193.2:91';
+        const baseUrl = API_URL.replace('/api', '');
 
         const getUrl = (path: string) => {
             if (!path) return '';

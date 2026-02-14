@@ -60,6 +60,37 @@ class PayrollController extends Controller
         ]);
     }
 
+    public function uploadEmployeePayslip(Request $request, $id)
+    {
+        $authUser = Auth::user();
+
+        if ($authUser->role !== 'accountant') {
+            return response()->json(['error' => 'Only accountants can upload payslips'], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|file|max:10240',
+        ]);
+
+        $submission = PayrollSubmission::findOrFail($id);
+        
+        // Update user_id check? Accountant can upload for any client submission.
+        
+        $file = $request->file('file');
+        // Store in a payslips folder
+        $folder = 'payslips/' . $submission->user_id . '/' . $submission->year . '/' . $submission->month;
+        $filename = $file->getClientOriginalName();
+        $path = $file->storeAs($folder, Str::random(10) . '_' . $filename, 'public');
+
+        $submission->update([
+            'status' => 'processed',
+            'payslip_file_path' => '/storage/' . $path,
+            'payslip_filename' => $filename,
+        ]);
+
+        return response()->json($submission);
+    }
+
     // ─── Payslips ───
 
     public function getPayslips(Request $request)
