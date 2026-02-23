@@ -24,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force all generated URLs (e.g., routes, redirects) to use HTTPS in production 
+        // to prevent Mixed Content errors when running behind the Caddy proxy
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         $this->configureDefaults();
     }
 
