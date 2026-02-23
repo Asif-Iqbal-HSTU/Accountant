@@ -9,10 +9,9 @@ services:
     ports:
       - "8000:80"
     environment:
-      - APP_ENV=local
-      - APP_KEY=base64:XG8o34J27I+Z1PZyIfQyA2Xv8zN6U0gXYQkV+F/Uv0A=
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8000
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://dockland.proconsulting.ai
       - DB_CONNECTION=sqlite
       - DB_DATABASE=/var/www/html/database/database.sqlite
     volumes:
@@ -20,8 +19,29 @@ services:
       - ./storage:/var/www/html/storage
       - ./database/database.sqlite:/var/www/html/database/database.sqlite
     networks:
-      - accountant-network
+      - proconsulting_network
+
+  caddy:
+    image: caddy:alpine
+    container_name: accountant-web-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile
+      - proconsulting_caddy_data:/data
+      - proconsulting_caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - proconsulting_network
 
 networks:
-  accountant-network:
+  proconsulting_network:
     driver: bridge
+
+volumes:
+  proconsulting_caddy_data:
+  proconsulting_caddy_config:
