@@ -59,22 +59,3 @@ npx expo start
 
 ## Notes
 - The mobile app API URL is set to `http://10.0.2.2:8000/api` for Android Emulator. Change it in `mobile/services/api.ts` if using a physical device (use your PC's IP address) or iOS Simulator (`http://localhost:8000/api`).
-
-
-
-# 1. Take down the container
-docker compose down
-
-# 2. Rebuild the container to capture our entrypoint.sh permission fix
-docker compose build app
-
-# 3. Fix the database file on the host machine
-# (If it's accidentally a directory, this removes it. If it's a file, it keeps it or creates it)
-rm -rf database/database.sqlite
-touch database/database.sqlite
-
-# 4. Bring the container back up
-docker compose up -d
-
-# 5. Run the database migrations inside the fresh container
-docker exec -it accountant-web-app php artisan migrate --force
