@@ -1,4 +1,22 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: accountant-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: accountant
+      POSTGRES_USER: accountant
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - accountant_pg_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accountant -d accountant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -8,18 +26,25 @@ services:
     restart: unless-stopped
     ports:
       - "8000:80"
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
       - APP_URL=https://dockland.proconsulting.ai
-      - DB_CONNECTION=sqlite
-      - DB_DATABASE=/var/www/html/database/database.sqlite
+      - DB_CONNECTION=pgsql
+      - DB_HOST=accountant-db
+      - DB_PORT=5432
+      - DB_DATABASE=accountant
+      - DB_USERNAME=accountant
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - ./.env:/var/www/html/.env
       - ./storage:/var/www/html/storage
-      - ./database/database.sqlite:/var/www/html/database/database.sqlite
     networks:
-      - proconsulting_network
+      - backend
+      - frontend
 
   caddy:
     image: caddy:alpine
@@ -36,12 +61,15 @@ services:
     depends_on:
       - app
     networks:
-      - proconsulting_network
+      - frontend
 
 networks:
-  proconsulting_network:
+  backend:
+    driver: bridge
+  frontend:
     driver: bridge
 
 volumes:
+  accountant_pg_data:
   proconsulting_caddy_data:
   proconsulting_caddy_config:

@@ -13,12 +13,13 @@ RUN apk add --no-cache \
   oniguruma-dev \
   libxml2-dev \
   sqlite-dev \
+  postgresql-dev \
   linux-headers \
   nodejs \
   npm
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd
+RUN docker-php-ext-install pdo_mysql pdo_sqlite pdo_pgsql mbstring exif pcntl bcmath gd
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -52,11 +53,12 @@ RUN apk add --no-cache \
   oniguruma-dev \
   libxml2-dev \
   sqlite-dev \
+  postgresql-dev \
   linux-headers \
   $PHPIZE_DEPS
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql pdo_sqlite mbstring exif pcntl bcmath gd \
+RUN docker-php-ext-install pdo_mysql pdo_sqlite pdo_pgsql mbstring exif pcntl bcmath gd \
   && pecl install redis \
   && docker-php-ext-enable redis
 
