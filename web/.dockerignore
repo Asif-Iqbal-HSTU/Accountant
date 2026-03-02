@@ -1,5 +1,7 @@
 /vendor/
 /node_modules/
+
+# Public assets & storage
 /public/build/
 /public/hot/
 /public/storage/
@@ -10,16 +12,43 @@
 /storage/framework/testing/*
 /storage/framework/views/*
 /storage/logs/*
+
+# Environment & IDE
 .env
+.env.*
 .idea/
 .vscode/
-*.log
+.DS_Store
+
+# Docker & CI
 docker-compose.yml
-.git
-.github
+.git/
+.github/
+.gitignore
 .phpunit.result.cache
-Homestead.json
-Homestead.yaml
+
+# Development & Test Files
+/tests/
+/reports/
+load-test.php
+load-test.yml
+test_api.php
+phpunit.xml
+pint.json
+tsconfig.json
+eslint.config.js
+vite.config.ts
+components.json
+.prettier*
+.editorconfig
+.gitattributes
+
+# Logs
+*.log
 npm-debug.log
 yarn-error.log
-.DS_Store
+
+# Legacy/Misc
+Homestead.json
+Homestead.yaml
+.env.example
