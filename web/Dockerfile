@@ -1,7 +1,8 @@
 # ==========================================
 # Build Stage 1: Builder (PHP + Node)
 # ==========================================
-FROM php:8.4-cli-alpine AS builder
+FROM php:8.2.28-cli-alpine3.23 AS builder
+RUN apk upgrade --no-cache
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -13,16 +14,15 @@ RUN apk add --no-cache \
     oniguruma-dev \
     libxml2-dev \
     postgresql-dev \
-    linux-headers \
     nodejs \
     npm \
     $PHPIZE_DEPS
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd \
-    && pecl install redis \
+    && pecl install redis-6.1.0 \
     && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS \
+    && apk del $PHPIZE_DEPS postgresql-dev \
     && rm -rf /tmp/pear
 
 # Get latest Composer
@@ -41,33 +41,28 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 RUN npm ci \
     && (npm audit fix || true) \
     && (npm audit || true) \
-    && npm run build
-
-# Remove node_modules to keep final image clean
-RUN rm -rf node_modules
+    && npm run build \
+    && rm -rf node_modules
 
 # ==========================================
 # Build Stage 2: Production PHP Application
 # ==========================================
-FROM php:8.4.18-fpm-alpine3.23
+FROM php:8.2.28-fpm-alpine3.23
+RUN apk upgrade --no-cache
 
-# Install system dependencies + build tools for PECL (removed after)
+# Only runtime libs needed — no dev packages, no compilation
 RUN apk add --no-cache \
     nginx \
     supervisor \
-    libpng-dev \
-    oniguruma-dev \
-    libxml2-dev \
-    postgresql-dev \
-    linux-headers \
-    $PHPIZE_DEPS
+    libpng \
+    oniguruma \
+    libxml2 \
+    libpq \
+    nodejs
 
-# Install PHP extensions, then purge build tools
-RUN docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS \
-    && rm -rf /tmp/pear /var/cache/apk/*
+# Copy compiled extensions from builder
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 # Set working directory
 WORKDIR /var/www/html
