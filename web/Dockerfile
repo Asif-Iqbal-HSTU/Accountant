@@ -34,8 +34,10 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN composer install --no-interaction --optimize-autoloader --no-dev
 
 # Install NPM dependencies and build frontend assets
-RUN npm ci
-RUN npm run build
+RUN npm ci \
+    && (npm audit fix || true) \
+    && (npm audit || true) \
+    && npm run build
 
 # Remove node_modules to keep final image clean
 RUN rm -rf node_modules
