@@ -1,0 +1,26 @@
+services:
+  mobile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: accountant-mobile-app
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    environment:
+      - NODE_ENV=development
+      # EXPO_DEVTOOLS_LISTEN_ADDRESS forces DevTools to bind to all interfaces
+      - EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+      # REACT_NATIVE_PACKAGER_HOSTNAME should be set if connecting from a physical device
+      - REACT_NATIVE_PACKAGER_HOSTNAME=158.178.236.37
+    volumes:
+      # Mount the mobile directory to allow hot-reloading
+      - ./:/app
+      # Create an anonymous volume for node_modules to avoid overwriting Linux binaries
+      # with potential Windows/Mac binaries from the host
+      - /app/node_modules
+    stdin_open: true
+    tty: true

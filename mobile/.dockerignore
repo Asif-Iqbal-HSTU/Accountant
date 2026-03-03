@@ -1,0 +1,21 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.pnp.*
+.pnp.js
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
+*.pem
+
+# Expo Desktop App
+.expo-shared
+
+# Mac files
+.DS_Store

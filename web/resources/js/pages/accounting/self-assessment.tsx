@@ -9,7 +9,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const YEARS = ['2023/2024', '2024/2025', '2025/2026'];
+// Dynamically compute tax years based on current date
+// UK Self Assessment tax year runs April to April (e.g., 2025/2026 = Apr 2025 – Apr 2026)
+const now = new Date();
+const currentCalendarYear = now.getFullYear();
+const currentMonth = now.getMonth(); // 0-indexed (0=Jan, 3=Apr)
+// If we're in Jan-Mar, the current tax year started last April
+const currentTaxYearStart = currentMonth < 3 ? currentCalendarYear - 1 : currentCalendarYear;
+const YEARS = [
+    `${currentTaxYearStart - 2}/${currentTaxYearStart - 1}`,
+    `${currentTaxYearStart - 1}/${currentTaxYearStart}`,
+    `${currentTaxYearStart}/${currentTaxYearStart + 1}`,
+];
+const DEFAULT_TAX_YEAR = `${currentTaxYearStart}/${currentTaxYearStart + 1}`;
 
 interface Props {
     userId?: number;
@@ -20,7 +32,7 @@ export default function SelfAssessment({ userId, clientName }: Props) {
     const { auth } = usePage().props as any;
     const isAccountant = auth.user.role === 'accountant';
 
-    const [selectedYear, setSelectedYear] = useState('2024/2025');
+    const [selectedYear, setSelectedYear] = useState(DEFAULT_TAX_YEAR);
     const [taxData, setTaxData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 

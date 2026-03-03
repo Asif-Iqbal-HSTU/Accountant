@@ -1,0 +1,88 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/postgres
+    container_name: accountant-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: accountant
+      POSTGRES_USER: accountant
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - accountant_pg_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accountant -d accountant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: accountant-web
+    container_name: accountant-web-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://dockland.proconsulting.ai
+      - DB_CONNECTION=pgsql
+      - DB_HOST=accountant-db
+      - DB_PORT=5432
+      - DB_DATABASE=accountant
+      - DB_USERNAME=accountant
+      - DB_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./.env:/var/www/html/.env
+      - ./storage:/var/www/html/storage
+    networks:
+      - backend
+      - frontend
+
+  caddy:
+    build:
+      context: .
+      dockerfile: docker/caddy
+    container_name: accountant-web-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile
+      - proconsulting_caddy_data:/data
+      - proconsulting_caddy_config:/config
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - frontend
+
+networks:
+  backend:
+    driver: bridge
+  frontend:
+    driver: bridge
+
+volumes:
+  accountant_pg_data:
+  proconsulting_caddy_data:
+  proconsulting_caddy_config:

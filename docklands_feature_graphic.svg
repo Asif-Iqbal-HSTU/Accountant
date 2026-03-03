@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Logo Gradient -->
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#14b8a6" />
+    </linearGradient>
+
+    <!-- Abstract Shape Gradients -->
+    <linearGradient id="shape1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#14b8a6" stop-opacity="0.05" />
+    </linearGradient>
+    <linearGradient id="shape2Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.02" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="15" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="shadow" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="500" fill="url(#bgGrad)" />
+
+  <!-- Abstract Shapes -->
+  <circle cx="850" cy="100" r="300" fill="url(#shape1Grad)" />
+  <circle cx="150" cy="400" r="250" fill="url(#shape2Grad)" />
+  <path d="M-100 250 Q200 400 512 250 T1124 250 L1124 600 L-100 600 Z" fill="url(#shape1Grad)" />
+
+  <!-- Center Content Group -->
+  <g transform="translate(362, 130)">
+    <!-- Logo Box -->
+    <rect x="0" y="0" width="300" height="300" rx="60" fill="url(#logoGrad)" filter="url(#shadow)" />
+    
+    <!-- Logo Text "AC" -->
+    <text x="150" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="120" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="-2">AC</text>
+
+    <!-- Shine Effect on Logo -->
+    <path d="M0 60 Q150 150 300 0 L300 0 L0 0 Z" fill="#ffffff" fill-opacity="0.1" />
+  </g>
+
+  <!-- Main Title -->
+  <text x="512" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="42" font-weight="800" fill="#f8fafc" letter-spacing="1" text-anchor="middle">
+    Docklands Accountants
+  </text>
+  
+  <text x="512" y="115" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="500" fill="#94a3b8" letter-spacing="4" text-anchor="middle" text-transform="uppercase">
+    Your Entire Accounting Team
+  </text>
+
+  <!-- Floating UI Cards -->
+  <!-- Left Card (Payroll) -->
+  <g transform="translate(100, 180)" filter="url(#shadow)">
+    <rect width="200" height="140" rx="20" fill="#1e293b" fill-opacity="0.6" stroke="rgba(255,255,255,0.1)" stroke-width="2" />
+    <rect x="20" y="20" width="40" height="40" rx="10" fill="rgba(20, 184, 166, 0.2)" />
+    <circle cx="40" cy="40" r="10" fill="#14b8a6" />
+    <text x="75" y="47" font-family="sans-serif" font-size="16" font-weight="bold" fill="#f1f5f9">Payroll</text>
+    <rect x="20" y="80" width="160" height="8" rx="4" fill="#334155" />
+    <rect x="20" y="100" width="120" height="8" rx="4" fill="#334155" />
+  </g>
+
+  <!-- Right Card (Messages) -->
+  <g transform="translate(724, 180)" filter="url(#shadow)">
+    <rect width="200" height="140" rx="20" fill="#1e293b" fill-opacity="0.6" stroke="rgba(255,255,255,0.1)" stroke-width="2" />
+    <rect x="140" y="20" width="40" height="40" rx="10" fill="rgba(59, 130, 246, 0.2)" />
+    <!-- Chat Icon -->
+    <path d="M152 45 C 150 45, 150 48, 150 48 L150 35 C 150 33, 152 32, 152 32 L168 32 C 170 32, 170 35, 170 35 L170 42 C 170 44, 168 44, 168 44 Z" fill="#3b82f6" />
+    
+    <text x="20" y="47" font-family="sans-serif" font-size="16" font-weight="bold" fill="#f1f5f9">Tax Returns</text>
+    <rect x="20" y="80" width="160" height="8" rx="4" fill="#334155" />
+    <rect x="60" y="100" width="120" height="8" rx="4" fill="#334155" />
+  </g>
+
+</svg>

@@ -1,0 +1,3 @@
+dockland.proconsulting.ai {
+    reverse_proxy app:80
+}

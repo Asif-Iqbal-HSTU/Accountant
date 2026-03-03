@@ -11,9 +11,16 @@
 /resources/js/wayfinder
 /vendor
 .DS_Store
+# SOPS: ignore plaintext env files, allow encrypted ones
 .env
+.env.*
+!.env.*.enc
 .env.backup
 .env.production
+
+# Age private keys - NEVER commit
+key.txt
+*.age-key
 .phpactor.json
 .phpunit.result.cache
 Homestead.json

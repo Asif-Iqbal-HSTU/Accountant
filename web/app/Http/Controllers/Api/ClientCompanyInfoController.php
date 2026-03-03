@@ -47,8 +47,9 @@ class ClientCompanyInfoController extends Controller
 
         $targetUserId = $request->user_id ?? $authUser->id;
 
-        if ($authUser->role !== 'accountant' && $authUser->id != $targetUserId) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Only accountants can upload or edit company info
+        if ($authUser->role !== 'accountant') {
+            return response()->json(['error' => 'Unauthorized. Only accountants can modify company info.'], 403);
         }
 
         $data = collect($validated)->except(['user_id', 'incorporation_certificate'])->toArray();

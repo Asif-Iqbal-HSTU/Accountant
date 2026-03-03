@@ -50,7 +50,7 @@ export default function Welcome() {
         {
             name: 'Sarah Mitchell',
             role: 'Partner, Mitchell & Associates',
-            quote: 'AccountantConnect transformed how we interact with our clients. Response times improved by 80%.',
+            quote: 'Docklands Accountants transformed how we interact with our clients. Response times improved by 80%.',
             avatar: 'SM'
         },
         {
@@ -69,7 +69,7 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title="AccountantConnect - The Platform for Modern Accountants">
+            <Head title="Docklands Accountants - Professional Accounting Services">
                 <link rel="preconnect" href="https://fonts.bunny.net" />
                 <link
                     href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap"
@@ -89,12 +89,7 @@ export default function Welcome() {
                 <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 50 ? 'bg-slate-900/95 backdrop-blur-md shadow-xl' : ''}`}>
                     <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-teal-400 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-500/25">
-                                AC
-                            </div>
-                            <span className="text-xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                                AccountantConnect
-                            </span>
+                            <img src="/docklands.png" alt="Docklands Accountants" className="h-10 w-auto object-contain" />
                         </div>
                         <div className="flex items-center gap-4">
                             {auth.user ? (
@@ -105,20 +100,12 @@ export default function Welcome() {
                                     Go to Dashboard
                                 </Link>
                             ) : (
-                                <>
-                                    <Link
-                                        href="/login"
-                                        className="px-5 py-2 text-slate-300 hover:text-white transition-colors font-medium"
-                                    >
-                                        Sign In
-                                    </Link>
-                                    <Link
-                                        href="/setup"
-                                        className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-teal-400 rounded-full font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105"
-                                    >
-                                        Get Started Free
-                                    </Link>
-                                </>
+                                <Link
+                                    href="/login"
+                                    className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-teal-400 rounded-full font-semibold text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all hover:scale-105"
+                                >
+                                    Sign In
+                                </Link>
                             )}
                         </div>
                     </div>
@@ -152,10 +139,10 @@ export default function Welcome() {
                         {/* CTA Buttons */}
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
                             <Link
-                                href="/setup"
+                                href="/login"
                                 className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-teal-400 rounded-2xl font-bold text-lg shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all hover:scale-105 flex items-center gap-3"
                             >
-                                Start Free Trial
+                                Sign In to Dashboard
                                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                 </svg>
@@ -176,7 +163,7 @@ export default function Welcome() {
                                     <div className="w-3 h-3 rounded-full bg-red-400" />
                                     <div className="w-3 h-3 rounded-full bg-yellow-400" />
                                     <div className="w-3 h-3 rounded-full bg-green-400" />
-                                    <span className="ml-4 text-sm text-slate-500">AccountantConnect Dashboard</span>
+                                    <span className="ml-4 text-sm text-slate-500">Docklands Accountants Dashboard</span>
                                 </div>
                                 <div className="p-8">
                                     <div className="grid grid-cols-3 gap-6">
@@ -333,18 +320,18 @@ export default function Welcome() {
                                     <span className="bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">Client Experience?</span>
                                 </h2>
                                 <p className="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
-                                    Join 500+ accounting firms already using AccountantConnect to provide exceptional service to their clients.
+                                    Join hundreds of businesses already using Docklands Accountants for exceptional accounting services.
                                 </p>
                                 <Link
-                                    href="/setup"
+                                    href="/login"
                                     className="inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-500 to-teal-400 rounded-2xl font-bold text-lg shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all hover:scale-105"
                                 >
-                                    Start Your Free Trial
+                                    Access Your Account
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                     </svg>
                                 </Link>
-                                <p className="mt-4 text-sm text-slate-500">No credit card required • 14-day free trial</p>
+                                <p className="mt-4 text-sm text-slate-500">Secure, encrypted access to your dashboard</p>
                             </div>
                         </div>
                     </div>
@@ -355,10 +342,7 @@ export default function Welcome() {
                     <div className="max-w-7xl mx-auto">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-teal-400 rounded-xl flex items-center justify-center font-bold shadow-lg">
-                                    AC
-                                </div>
-                                <span className="text-lg font-bold">AccountantConnect</span>
+                                <img src="/docklands.png" alt="Docklands Accountants" className="h-10 w-auto object-contain" />
                             </div>
                             <div className="flex gap-8 text-sm text-slate-400">
                                 <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
@@ -366,7 +350,7 @@ export default function Welcome() {
                                 <a href="#" className="hover:text-white transition-colors">Contact</a>
                             </div>
                             <div className="text-sm text-slate-500">
-                                © 2026 AccountantConnect. Made for London Accountants.
+                                © 2026 Docklands Accountants. Professional Accounting Services.
                             </div>
                         </div>
                     </div>

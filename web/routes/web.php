@@ -2,19 +2,19 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
-    return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
+    return Inertia::render('welcome');
 })->name('home');
 
-Route::get('setup', function () {
-    return Inertia::render('setup/accountant');
-})->name('setup');
+// Public account deletion request page (required by Google Play Store)
+Route::get('/account-deletion', function () {
+    return Inertia::render('account-deletion');
+})->name('account-deletion');
 
-Route::post('setup', [\App\Http\Controllers\SetupController::class, 'setupAccountant'])->name('setup.submit');
+// Setup routes removed — accountant registration is handled by the software company
+// Route::get('setup', ...)->name('setup');
+// Route::post('setup', ...)->name('setup.submit');
 
 Route::get('dashboard', function () {
     $clients = [];

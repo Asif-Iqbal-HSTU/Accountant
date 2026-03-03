@@ -55,7 +55,7 @@ export default function AccountantSetup() {
 
     return (
         <>
-            <Head title="Get Started - AccountantConnect">
+            <Head title="Get Started - Docklands Accountants">
                 <link rel="preconnect" href="https://fonts.bunny.net" />
                 <link
                     href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap"
@@ -74,10 +74,7 @@ export default function AccountantSetup() {
                     {/* Logo */}
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-teal-400 rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/25">
-                                AC
-                            </div>
-                            <span className="text-2xl font-bold text-white">AccountantConnect</span>
+                            <img src="/docklands.png" alt="Docklands Accountants" className="h-14 w-auto object-contain" />
                         </div>
                         <p className="text-slate-400">Set up your account in just a few steps</p>
                     </div>

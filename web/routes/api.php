@@ -11,6 +11,9 @@ Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']
 Route::post('/setup/profile', [\App\Http\Controllers\Api\SetupController::class, 'setupProfile']);
 Route::post('/setup/check-email', [\App\Http\Controllers\Api\SetupController::class, 'checkEmail']);
 
+// Public account deletion request (Play Store requirement)
+Route::post('/account/request-deletion', [\App\Http\Controllers\Api\AccountDeletionController::class, 'requestDeletion']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
@@ -97,4 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Self Assessment
     Route::get('/self-assessment', [\App\Http\Controllers\Api\SelfAssessmentController::class, 'index']);
     Route::post('/self-assessment', [\App\Http\Controllers\Api\SelfAssessmentController::class, 'store']);
+
+    // Account deletion (authenticated - requires password confirmation)
+    Route::delete('/account', [\App\Http\Controllers\Api\AccountDeletionController::class, 'destroy']);
 });

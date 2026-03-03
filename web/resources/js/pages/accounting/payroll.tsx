@@ -15,7 +15,22 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-const TAX_YEARS_P60 = ['2023/2024', '2024/2025', '2025/2026'];
+
+// Dynamically compute tax years based on current date
+const _now = new Date();
+const _calYear = _now.getFullYear();
+const _calMonth = _now.getMonth(); // 0-indexed (0=Jan, 3=Apr)
+// UK tax year runs April to March. If Jan-Mar, current tax year started previous April.
+const _taxYearStart = _calMonth < 3 ? _calYear - 1 : _calYear;
+const TAX_YEARS = [
+    `${_taxYearStart - 2}/${_taxYearStart - 1}`,
+    `${_taxYearStart - 1}/${_taxYearStart}`,
+    `${_taxYearStart}/${_taxYearStart + 1}`,
+];
+const DEFAULT_TAX_YEAR = `${_taxYearStart}/${_taxYearStart + 1}`;
+// Current month name for default month selector
+const MONTH_NAMES_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DEFAULT_MONTH = MONTH_NAMES_FULL[_calMonth];
 
 interface PayrollProps {
     userId?: number;
@@ -31,7 +46,7 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
     const targetUserId = userId || user.id;
 
     const [activeTab, setActiveTab] = useState('submissions');
-    const [selectedYear, setSelectedYear] = useState('2024/2025');
+    const [selectedYear, setSelectedYear] = useState(DEFAULT_TAX_YEAR);
     const [loading, setLoading] = useState(false);
 
     // Data
@@ -39,11 +54,11 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
     const [liabilities, setLiabilities] = useState<any[]>([]);
     const [starterForm, setStarterForm] = useState<any>(null);
     const [p60p45s, setP60p45s] = useState<any[]>([]);
-    const [selectedP60Year, setSelectedP60Year] = useState('2024/2025');
+    const [selectedP60Year, setSelectedP60Year] = useState(DEFAULT_TAX_YEAR);
 
     // Submit Modal (Client)
     const [isSubmitOpen, setIsSubmitOpen] = useState(false);
-    const [selectedMonth, setSelectedMonth] = useState('');
+    const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH);
     const [submitForm, setSubmitForm] = useState({ name: '', hours: '', holidays: '', notes: '' });
 
     // Upload Modals (Accountant)
@@ -483,7 +498,7 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                         <SelectValue placeholder="Tax Year" />
                     </SelectTrigger>
                     <SelectContent>
-                        {TAX_YEARS_P60.map(year => (
+                        {TAX_YEARS.map(year => (
                             <SelectItem key={year} value={year}>{year}</SelectItem>
                         ))}
                     </SelectContent>
@@ -573,7 +588,7 @@ export default function Payroll({ userId, clientName }: PayrollProps) {
                                 <SelectValue placeholder="Year" />
                             </SelectTrigger>
                             <SelectContent>
-                                {['2023/2024', '2024/2025', '2025/2026'].map(y => (
+                                {TAX_YEARS.map(y => (
                                     <SelectItem key={y} value={y}>{y}</SelectItem>
                                 ))}
                             </SelectContent>

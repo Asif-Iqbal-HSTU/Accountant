@@ -18,7 +18,6 @@ import api from '../../services/api';
 
 export default function CompanyInfoScreen() {
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
         company_number: '',
         auth_code: '',
@@ -52,17 +51,7 @@ export default function CompanyInfoScreen() {
         }
     };
 
-    const saveCompanyInfo = async () => {
-        setSaving(true);
-        try {
-            await api.post('/company-info', form);
-            Alert.alert('Success', 'Company information saved successfully');
-        } catch (error) {
-            Alert.alert('Error', 'Failed to save company information');
-        } finally {
-            setSaving(false);
-        }
-    };
+
 
     const fields = [
         { key: 'company_number', label: 'Company Number', icon: 'business-outline' },
@@ -106,7 +95,7 @@ export default function CompanyInfoScreen() {
                         >
                             <Ionicons name="information-circle" size={20} color="#3b82f6" />
                             <Text style={styles.bannerText}>
-                                Enter your company registration details below. Your accountant can also update these from the portal.
+                                Your company registration details. Only your accountant can update these from the portal.
                             </Text>
                         </LinearGradient>
                     </View>
@@ -119,45 +108,16 @@ export default function CompanyInfoScreen() {
                                 <Text style={styles.labelText}>{field.label}</Text>
                             </View>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { opacity: 0.8 }]}
                                 value={form[field.key as keyof typeof form]}
-                                onChangeText={(text) => setForm({ ...form, [field.key]: text })}
-                                placeholder={`Enter ${field.label.toLowerCase()}`}
+                                editable={false}
+                                placeholder={`No ${field.label.toLowerCase()} provided`}
                                 placeholderTextColor="#475569"
                             />
                         </View>
                     ))}
 
-                    {/* Incorporation Certificate */}
-                    <View style={styles.fieldContainer}>
-                        <View style={styles.fieldLabel}>
-                            <Ionicons name="document-attach-outline" size={16} color="#14b8a6" />
-                            <Text style={styles.labelText}>Incorporation Certificate</Text>
-                        </View>
-                        <TouchableOpacity style={styles.uploadBtn}>
-                            <Ionicons name="cloud-upload-outline" size={20} color="#3b82f6" />
-                            <Text style={styles.uploadText}>Upload Certificate</Text>
-                        </TouchableOpacity>
-                    </View>
 
-                    {/* Save Button */}
-                    <TouchableOpacity onPress={saveCompanyInfo} disabled={saving} style={styles.saveContainer}>
-                        <LinearGradient
-                            colors={['#3b82f6', '#14b8a6']}
-                            style={styles.saveBtn}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
-                            {saving ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <>
-                                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                                    <Text style={styles.saveText}>Save Company Info</Text>
-                                </>
-                            )}
-                        </LinearGradient>
-                    </TouchableOpacity>
 
                     <View style={{ height: 40 }} />
                 </ScrollView>
@@ -200,17 +160,4 @@ const styles = StyleSheet.create({
         fontSize: 15, color: '#fff',
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     },
-    uploadBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderRadius: 12, paddingVertical: 14,
-        borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)', borderStyle: 'dashed',
-    },
-    uploadText: { fontSize: 14, fontWeight: '600', color: '#3b82f6' },
-    saveContainer: { marginTop: 8, borderRadius: 12, overflow: 'hidden' },
-    saveBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 8, paddingVertical: 16,
-    },
-    saveText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

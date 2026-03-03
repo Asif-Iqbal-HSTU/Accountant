@@ -10,6 +10,7 @@ import {
     Platform,
     ActivityIndicator,
     StatusBar,
+    Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,13 +90,11 @@ export default function Login() {
 
                         {/* Logo */}
                         <View style={styles.logoContainer}>
-                            <LinearGradient
-                                colors={['#3b82f6', '#14b8a6']}
-                                style={styles.logoGradient}
-                            >
-                                <Text style={styles.logoText}>AC</Text>
-                            </LinearGradient>
-                            <Text style={styles.appName}>AccountantConnect</Text>
+                            <Image
+                                source={require('../assets/images/docklands.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
                             <Text style={styles.subtitle}>Sign in to your account</Text>
                         </View>
 
@@ -161,13 +160,6 @@ export default function Login() {
                                 </LinearGradient>
                             </TouchableOpacity>
 
-                            {/* Divider */}
-                            <View style={styles.divider}>
-                                <View style={styles.dividerLine} />
-                                <Text style={styles.dividerText}>or</Text>
-                                <View style={styles.dividerLine} />
-                            </View>
-
                             {/* Remember Me */}
                             <View style={styles.rememberRow}>
                                 <TouchableOpacity
@@ -183,14 +175,6 @@ export default function Login() {
                                     <Text style={styles.forgotPassword}>Forgot Password?</Text>
                                 </TouchableOpacity>
                             </View>
-
-                            {/* Setup link -> Register */}
-                            <TouchableOpacity
-                                onPress={() => router.push('/register')}
-                                style={styles.setupButton}
-                            >
-                                <Text style={styles.setupButtonText}>Create new account</Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
                 </KeyboardAvoidingView>
@@ -248,17 +232,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 32,
     },
-    logoGradient: {
-        width: 64,
-        height: 64,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
-        elevation: 10,
+    logoImage: {
+        width: 200,
+        height: 80,
     },
     logoText: {
         color: '#fff',
@@ -383,17 +359,5 @@ const styles = StyleSheet.create({
     forgotPassword: {
         color: '#3b82f6',
         fontSize: 14,
-    },
-    setupButton: {
-        paddingVertical: 14,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-    },
-    setupButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '500',
     },
 });

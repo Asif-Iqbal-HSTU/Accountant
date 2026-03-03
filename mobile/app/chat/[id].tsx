@@ -24,8 +24,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
 import api, { API_URL } from '../../services/api';
-import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
+import { RichEditor, RichToolbar, actions } from '../../components/ui/RichText';
 
 // Defined types to avoid TS errors
 type Message = {
@@ -117,23 +118,26 @@ export default function ChatScreen() {
     useEffect(() => {
         navigation.setOptions({
             headerTitle: () => (
-                <View>
-                    <Text style={{ fontSize: 17, fontWeight: '600' }}>{chatPartnerName}</Text>
-                    {partnerTyping && (
-                        <Text style={{ fontSize: 12, color: '#22c55e', fontStyle: 'italic' }}>typing...</Text>
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: '#FFFFFF' }}>{chatPartnerName}</Text>
+                    {partnerTyping ? (
+                        <Text style={{ fontSize: 11, color: '#4ADE80', fontWeight: '500' }}>typing...</Text>
+                    ) : (
+                        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '400' }}>Online</Text>
                     )}
                 </View>
             ),
+            headerStyle: {
+                backgroundColor: '#0F172A', // Dark Slate matching dashboard
+            },
+            headerTintColor: '#FFFFFF',
             headerRight: () => (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginRight: 8 }}>
                     <TouchableOpacity onPress={() => setIsSearching(!isSearching)}>
-                        <Ionicons name={isSearching ? "close" : "search"} size={22} color="#007AFF" />
+                        <Ionicons name={isSearching ? "close" : "search-outline"} size={22} color="#FFFFFF" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowDateFilter(!showDateFilter)}>
-                        <Ionicons name="calendar-outline" size={22} color={showDateFilter ? "#007AFF" : "#666"} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={archiveConversation}>
-                        <Ionicons name="archive-outline" size={22} color="#666" />
+                        <Ionicons name="calendar-outline" size={22} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
             ),
@@ -313,12 +317,44 @@ export default function ChatScreen() {
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
     };
 
-    const playAudio = async (uri: string) => {
+    const [playbackStatus, setPlaybackStatus] = useState<{ [key: number]: any }>({});
+
+    const playAudio = async (id: number, uri: string) => {
         try {
-            if (sound) await sound.unloadAsync();
-            const { sound: newSound } = await Audio.Sound.createAsync({ uri });
+            if (sound) {
+                const status = await sound.getStatusAsync();
+                // @ts-ignore
+                if (status.isLoaded && status.uri === uri) {
+                    // @ts-ignore
+                    if (status.isPlaying) {
+                        await sound.pauseAsync();
+                        return;
+                    } else {
+                        await sound.playAsync();
+                        return;
+                    }
+                }
+                await sound.unloadAsync();
+            }
+
+            const { sound: newSound } = await Audio.Sound.createAsync(
+                { uri },
+                { shouldPlay: true },
+                (status) => {
+                    if (status.isLoaded) {
+                        setPlaybackStatus(prev => ({
+                            ...prev,
+                            [id]: {
+                                position: status.positionMillis,
+                                duration: status.durationMillis,
+                                isPlaying: status.isPlaying,
+                                isFinished: status.didJustFinish
+                            }
+                        }));
+                    }
+                }
+            );
             setSound(newSound);
-            await newSound.playAsync();
         } catch (error) {
             console.log("Error playing audio", error);
         }
@@ -371,7 +407,7 @@ export default function ChatScreen() {
 
 
     const renderMessageContent = (item: Message, isMyMessage: boolean) => {
-        const textColor = isMyMessage ? '#fff' : '#333';
+        const textColor = isMyMessage ? '#FFFFFF' : '#F1F5F9';
         const baseUrl = API_URL.replace('/api', '');
 
         const getUrl = (path: string) => {
@@ -383,16 +419,16 @@ export default function ChatScreen() {
         const messageType = item.type || 'text';
 
         const baseTagsStyles = {
-            body: { color: isMyMessage ? '#fff' : '#333', fontSize: 15 },
+            body: { color: isMyMessage ? '#FFFFFF' : '#F1F5F9', fontSize: 16 },
             p: { margin: 0, padding: 0 },
-            ul: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
-            ol: { marginTop: 4, marginBottom: 4, paddingLeft: 20 },
-            li: { marginBottom: 2 },
-            b: { fontWeight: 'bold' as 'bold' },
-            strong: { fontWeight: 'bold' as 'bold' },
-            i: { fontStyle: 'italic' as 'italic' },
-            em: { fontStyle: 'italic' as 'italic' },
-            u: { textDecorationLine: 'underline' as 'underline' },
+            ul: { marginTop: 4, marginBottom: 4, paddingLeft: 20, color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            ol: { marginTop: 4, marginBottom: 4, paddingLeft: 20, color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            li: { marginBottom: 2, color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            b: { fontWeight: 'bold' as 'bold', color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            strong: { fontWeight: 'bold' as 'bold', color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            i: { fontStyle: 'italic' as 'italic', color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            em: { fontStyle: 'italic' as 'italic', color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
+            u: { textDecorationLine: 'underline' as 'underline', color: isMyMessage ? '#FFFFFF' : '#F1F5F9' },
         };
 
         // Fallback for valid content width
@@ -408,7 +444,7 @@ export default function ChatScreen() {
                         source={{ html: safeHtml }}
                         tagsStyles={baseTagsStyles}
                         systemFonts={['System', 'Roboto', 'Arial', 'sans-serif']}
-                        defaultTextProps={{ allowFontScaling: true }}
+                        defaultTextProps={{ selectable: true }}
                     />
                 );
             } else if (item.type === 'image' && item.attachment_path) {
@@ -430,11 +466,35 @@ export default function ChatScreen() {
                     </View>
                 );
             } else if (item.type === 'audio' && item.attachment_path) {
+                const status = playbackStatus[item.id] || { position: 0, duration: 1, isPlaying: false };
+                const progress = status.position / status.duration;
+                
                 return (
-                    <TouchableOpacity onPress={() => playAudio(getUrl(item.attachment_path!))} style={styles.audioButton}>
-                        <Ionicons name="play-circle" size={32} color={textColor} />
-                        <Text style={{ color: textColor, marginLeft: 8, fontWeight: '500' }}>Voice Message</Text>
-                    </TouchableOpacity>
+                    <View style={styles.voicePlayerCard}>
+                        <TouchableOpacity 
+                            onPress={() => playAudio(item.id, getUrl(item.attachment_path!))}
+                            style={styles.playButton}
+                        >
+                            <Ionicons 
+                                name={status.isPlaying ? "pause" : "play"} 
+                                size={24} 
+                                color={textColor} 
+                            />
+                        </TouchableOpacity>
+                        <View style={styles.progressContainer}>
+                            <View style={styles.progressBar}>
+                                <View style={[styles.progressIndicator, { width: `${progress * 100}%`, backgroundColor: textColor }]} />
+                            </View>
+                            <Text style={[styles.durationText, { color: isMyMessage ? 'rgba(255,255,255,0.7)' : 'rgba(241, 245, 249, 0.7)' }]}>
+                                {status.isPlaying || status.position > 0 ? 
+                                    `${Math.floor(status.position / 1000 / 60)}:${String(Math.floor((status.position / 1000) % 60)).padStart(2, '0')}` : 
+                                    'Voice Message'}
+                            </Text>
+                        </View>
+                        <View style={styles.avatarContainer}>
+                            <Ionicons name="mic" size={16} color={textColor} />
+                        </View>
+                    </View>
                 );
             } else if (item.type === 'file' && item.attachment_path) {
                 return (
@@ -489,11 +549,16 @@ export default function ChatScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-        >
+        <View style={styles.container}>
+            <LinearGradient
+                colors={['#0f172a', '#1e293b', '#0f172a']}
+                style={StyleSheet.absoluteFill}
+            />
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+            >
             {isSearching && (
                 <View style={{ padding: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#eee' }}>
                     <View style={{ backgroundColor: '#f0f0f0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center' }}>
@@ -670,252 +735,232 @@ export default function ChatScreen() {
             </View>
 
             {/* Input Section at BOTTOM */}
-            <View style={[styles.inputSection, { paddingBottom: Platform.OS === 'ios' ? Math.max(8, keyboardHeight) : 8 }]}>
-                {/* Reply Preview */}
+            <View style={styles.inputArea}>
                 {replyTo && (
-                    <View style={styles.previewContainer}>
-                        <View style={[styles.previewContent, { borderLeftWidth: 3, borderLeftColor: '#007AFF', paddingLeft: 8 }]}>
-                            <View>
-                                <Text style={{ color: '#007AFF', fontWeight: 'bold', fontSize: 13 }}>Replying to</Text>
-                                <Text style={[styles.previewText, { fontSize: 14 }]} numberOfLines={1}>
-                                    {stripHtml(replyTo.content) || 'Attachment'}
-                                </Text>
-                            </View>
+                    <View style={styles.replyBubblePreview}>
+                        <View style={styles.replyIndicator} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.replyName}>Replying to...</Text>
+                            <Text numberOfLines={1} style={styles.replyTextPreview}>{stripHtml(replyTo.content)}</Text>
                         </View>
                         <TouchableOpacity onPress={() => setReplyTo(null)}>
-                            <Ionicons name="close-circle" size={24} color="#999" />
+                            <Ionicons name="close-circle" size={20} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
                 )}
 
-                {/* Attachment Preview */}
-                {attachment && (
-                    <View style={styles.previewContainer}>
-                        <View style={styles.previewContent}>
-                            <Ionicons
-                                name={attachment.category === 'image' ? 'image' : attachment.category === 'audio' ? 'mic' : 'document'}
-                                size={18}
-                                color="#666"
-                            />
-                            <Text style={styles.previewText} numberOfLines={1}>
-                                {attachment.name}
-                            </Text>
-                        </View>
-                        <TouchableOpacity onPress={() => setAttachment(null)}>
-                            <Ionicons name="close-circle" size={22} color="#999" />
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Formatting Toolbar */}
+                {/* Rich Text Toolbar */}
                 <RichToolbar
                     editor={richText}
-                    selectedIconTint="#007AFF"
-                    iconTint="#666"
+                    selectedIconTint="#3b82f6"
+                    iconTint="#94a3b8"
+                    style={styles.richToolbar}
                     actions={[
                         actions.setBold,
                         actions.setItalic,
+                        actions.insertBulletsList,
+                        actions.insertOrderedList,
+                        actions.setStrikethrough,
                         actions.setUnderline,
-                        actions.insertLink,
-                        actions.insertBulletsList,
-                        actions.insertOrderedList,
-                        actions.insertBulletsList,
-                        actions.insertOrderedList,
+                        actions.undo,
+                        actions.redo,
                     ]}
-                    iconMap={{
-                        [actions.setBold]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor }]}>B</Text>,
-                        [actions.setItalic]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor, fontStyle: 'italic' }]}>I</Text>,
-                        [actions.setUnderline]: ({ tintColor }: any) => <Text style={[styles.toolbarIcon, { color: tintColor, textDecorationLine: 'underline' }]}>U</Text>,
-                        [actions.insertLink]: ({ tintColor }: any) => <Ionicons name="link" size={20} color={tintColor} />,
-                    }}
-                    style={styles.toolbar}
                 />
-
-                {/* Main Input Row */}
-                <View style={styles.inputRow}>
-                    {/* Action Buttons */}
-                    <View style={styles.actionButtons}>
-                        <TouchableOpacity onPress={pickImage} style={styles.actionBtn}>
-                            <Ionicons name="image" size={22} color="#007AFF" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={pickDocument} style={styles.actionBtn}>
-                            <Ionicons name="attach" size={22} color="#007AFF" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPressIn={startRecording}
-                            onPressOut={stopRecording}
-                            style={[styles.actionBtn, recording && styles.recordingActive]}
-                        >
-                            <Ionicons name="mic" size={22} color={recording ? "#FF3B30" : "#007AFF"} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Rich Text Input */}
-                    <View style={styles.editorContainer}>
+                
+                <View style={styles.mainInputRow}>
+                    <TouchableOpacity onPress={pickImage} style={styles.inputActionBtn}>
+                        <Ionicons name="add" size={28} color="#3b82f6" />
+                    </TouchableOpacity>
+                    
+                    <View style={styles.textInputWrapper}>
                         <RichEditor
                             ref={richText}
                             onChange={(text) => {
                                 setMessageContent(text);
-                                // Trigger typing indicator
-                                if (typingTimeoutRef.current) {
-                                    clearTimeout(typingTimeoutRef.current);
-                                }
                                 sendTypingStatus();
-                                typingTimeoutRef.current = setTimeout(() => { }, 3000);
                             }}
                             placeholder="Type a message..."
-                            initialHeight={50}
+                            initialHeight={40}
                             editorStyle={{
-                                backgroundColor: '#F5F5F5',
-                                contentCSSText: 'font-size: 16px; padding: 10px 14px; min-height: 50px; line-height: 24px;',
-                                placeholderColor: '#999',
+                                backgroundColor: 'transparent',
+                                contentCSSText: 'font-size: 16px; color: #fff; min-height: 40px;',
+                                placeholderColor: '#64748b',
                             }}
-                            style={styles.richEditor}
+                            style={{ backgroundColor: 'transparent' }}
                         />
                     </View>
 
-                    {/* Send Button */}
-                    <TouchableOpacity
-                        onPress={() => {
-                            sendMessage();
-                            richText.current?.setContentHTML('');
-                        }}
-                        style={[styles.sendButton, (!messageContent.trim() && !attachment) && styles.sendButtonDisabled]}
-                        disabled={!messageContent.trim() && !attachment}
-                    >
-                        <Ionicons name="send" size={20} color="white" />
-                    </TouchableOpacity>
+                    {messageContent.trim() || attachment ? (
+                        <TouchableOpacity onPress={() => { sendMessage(); richText.current?.setContentHTML(''); }} style={styles.sendCircle}>
+                            <Ionicons name="send" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity 
+                            onLongPress={startRecording}
+                            onPressOut={stopRecording}
+                            style={[styles.sendCircle, recording ? { backgroundColor: '#ef4444' } : {}]}
+                        >
+                            <Ionicons name={recording ? "mic" : "mic-outline"} size={24} color="#fff" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </KeyboardAvoidingView>
-    );
+    </View>
+);
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#E8E8ED'
-    },
-    inputSection: {
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    previewContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        padding: 8,
-        borderRadius: 8,
-        marginBottom: 8,
-    },
-    previewContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    previewText: {
-        marginLeft: 8,
-        fontSize: 13,
-        color: '#666',
-        flex: 1,
-    },
-    inputRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    actionBtn: {
-        padding: 6,
-        marginRight: 4,
-    },
-    recordingActive: {
-        backgroundColor: '#FFEBEE',
-        borderRadius: 20,
-    },
-    toolbar: {
-        backgroundColor: '#F8F8F8',
-        borderRadius: 8,
-        marginBottom: 8,
-        height: 36,
-    },
-    toolbarIcon: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#666',
-    },
-    editorContainer: {
-        flex: 1,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 20,
-        overflow: 'hidden',
-        maxHeight: 150,
-    },
-    richEditor: {
-        flex: 1,
-        minHeight: 50,
-        maxHeight: 150,
-    },
-    sendButton: {
-        backgroundColor: '#007AFF',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    sendButtonDisabled: {
-        backgroundColor: '#B0B0B0',
+        backgroundColor: '#0f172a',
     },
     messagesList: {
-        padding: 12,
+        paddingHorizontal: 12,
         paddingBottom: 20,
+        paddingTop: 10,
     },
     messageItem: {
+        marginBottom: 4,
         paddingHorizontal: 14,
         paddingVertical: 10,
-        marginVertical: 4,
         borderRadius: 18,
-        maxWidth: '80%',
-    },
-    myMessage: {
-        backgroundColor: '#007AFF',
-        alignSelf: 'flex-end',
-        borderBottomRightRadius: 4,
-    },
-    otherMessage: {
-        backgroundColor: '#FFFFFF',
-        alignSelf: 'flex-start',
-        borderBottomLeftRadius: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        maxWidth: '85%',
         elevation: 1,
     },
-    messageDate: {
-        fontSize: 11,
-        color: '#888',
-        marginTop: 4,
+    myMessage: {
+        backgroundColor: '#3b82f6', // App Theme Blue
         alignSelf: 'flex-end',
+        borderTopRightRadius: 4,
     },
-    audioButton: {
+    otherMessage: {
+        backgroundColor: 'rgba(255,255,255,0.08)', // Dark Semi-transparent
+        alignSelf: 'flex-start',
+        borderTopLeftRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    messageDate: {
+        fontSize: 10,
+        color: '#94a3b8',
+        marginLeft: 8,
+    },
+    voicePlayerCard: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 4,
+        minWidth: 220,
+    },
+    playButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    progressContainer: {
+        flex: 1,
+        height: 40,
+        justifyContent: 'center',
+        paddingHorizontal: 12,
+    },
+    progressBar: {
+        height: 2,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 1,
+        width: '100%',
+        overflow: 'hidden',
+    },
+    progressIndicator: {
+        height: '100%',
+    },
+    durationText: {
+        fontSize: 10,
+        marginTop: 4,
+    },
+    avatarContainer: {
+        padding: 5,
+    },
+    inputArea: {
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        padding: 8,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+    },
+    richToolbar: {
+        backgroundColor: 'transparent',
+        height: 40,
+        marginBottom: 4,
+    },
+    mainInputRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: 8,
+    },
+    textInputWrapper: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 20,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        minHeight: 45,
+        maxHeight: 150,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    inputActionBtn: {
+        width: 45,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sendCircle: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: '#3b82f6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 3,
+    },
+    replyBubblePreview: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        marginBottom: 8,
+        borderRadius: 12,
+        padding: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    replyIndicator: {
+        width: 3,
+        height: '100%',
+        backgroundColor: '#3b82f6',
+        borderRadius: 2,
+        marginRight: 10,
+    },
+    replyName: {
+        fontWeight: 'bold',
+        fontSize: 12,
+        color: '#3b82f6',
+    },
+    replyTextPreview: {
+        fontSize: 12,
+        color: '#94a3b8',
     },
     fileButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 4,
+        paddingVertical: 8,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#0f172a',
     },
 });
 

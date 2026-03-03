@@ -9,7 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const YEARS = ['2023', '2024', '2025', '2026'];
+// Dynamically compute years based on current date
+const currentYear = new Date().getFullYear();
+const YEARS = [`${currentYear - 2}`, `${currentYear - 1}`, `${currentYear}`, `${currentYear + 1}`];
+const DEFAULT_YEAR = `${currentYear}`;
 
 interface Props {
     userId?: number;
@@ -20,7 +23,7 @@ export default function CorporationTax({ userId, clientName }: Props) {
     const { auth } = usePage().props as any;
     const isAccountant = auth.user.role === 'accountant';
 
-    const [selectedYear, setSelectedYear] = useState('2025');
+    const [selectedYear, setSelectedYear] = useState(DEFAULT_YEAR);
     const [taxData, setTaxData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 

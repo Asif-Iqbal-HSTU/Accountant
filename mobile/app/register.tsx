@@ -11,6 +11,7 @@ import {
     ScrollView,
     ActivityIndicator,
     StatusBar,
+    Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,13 +90,11 @@ export default function Register() {
                     >
                         {/* Logo */}
                         <View style={styles.logoContainer}>
-                            <LinearGradient
-                                colors={['#3b82f6', '#14b8a6']}
-                                style={styles.logoGradient}
-                            >
-                                <Text style={styles.logoText}>AC</Text>
-                            </LinearGradient>
-                            <Text style={styles.appName}>AccountantConnect</Text>
+                            <Image
+                                source={require('../assets/images/docklands.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
                             <Text style={styles.subtitle}>Create your account</Text>
                         </View>
 
@@ -357,17 +356,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
     },
-    logoGradient: {
-        width: 64,
-        height: 64,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 16,
-        elevation: 10,
+    logoImage: {
+        width: 200,
+        height: 80,
     },
     logoText: {
         color: '#fff',

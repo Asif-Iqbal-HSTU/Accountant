@@ -9,7 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const YEARS = ['2023', '2024', '2025', '2026'];
+// Dynamically compute years based on current date
+const currentYear = new Date().getFullYear();
+const YEARS = [`${currentYear - 2}`, `${currentYear - 1}`, `${currentYear}`, `${currentYear + 1}`];
+const DEFAULT_YEAR = `${currentYear}`;
 
 interface Props {
     userId?: number;
@@ -20,13 +23,13 @@ export default function Accounts({ userId, clientName }: Props) {
     const { auth } = usePage().props as any;
     const isAccountant = auth.user.role === 'accountant';
 
-    const [selectedYear, setSelectedYear] = useState('2025');
+    const [selectedYear, setSelectedYear] = useState(DEFAULT_YEAR);
     const [accounts, setAccounts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Upload State
     const [isUploadOpen, setIsUploadOpen] = useState(false);
-    const [uploadYear, setUploadYear] = useState('2025');
+    const [uploadYear, setUploadYear] = useState(DEFAULT_YEAR);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
 

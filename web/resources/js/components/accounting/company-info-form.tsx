@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Building2, Save, Loader2, Upload, FileText } from 'lucide-react';
 
@@ -10,6 +11,8 @@ interface CompanyInfoFormProps {
 }
 
 export default function CompanyInfoForm({ userId, initialData, onSuccess }: CompanyInfoFormProps) {
+    const user = (usePage().props as any).auth.user;
+    const isAccountant = user?.role === 'accountant';
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
         company_number: '',
@@ -108,7 +111,8 @@ export default function CompanyInfoForm({ userId, initialData, onSuccess }: Comp
                             value={(form as any)[field.key]}
                             onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
                             placeholder={field.placeholder}
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900/50"
+                            readOnly={!isAccountant}
+                            className={`w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900/50 ${!isAccountant ? 'opacity-75 cursor-not-allowed' : ''}`}
                         />
                     </div>
                 ))}
@@ -118,8 +122,8 @@ export default function CompanyInfoForm({ userId, initialData, onSuccess }: Comp
                 <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4">Incorporation Certificate</h3>
 
                 <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                    onClick={() => isAccountant && fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center transition-colors ${isAccountant ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group' : ''}`}
                 >
                     {form.certificate_file ? (
                         <div className="flex items-center justify-center gap-4">
@@ -153,11 +157,11 @@ export default function CompanyInfoForm({ userId, initialData, onSuccess }: Comp
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-2 text-slate-500">
-                            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                            <div className={`w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2 ${isAccountant ? 'group-hover:scale-110 transition-transform' : ''}`}>
                                 <Upload className="w-6 h-6" />
                             </div>
-                            <p className="font-medium">Click to upload certificate</p>
-                            <p className="text-xs">PDF, PNG or JPG up to 10MB</p>
+                            <p className="font-medium">{isAccountant ? 'Click to upload certificate' : 'No certificate uploaded'}</p>
+                            {isAccountant && <p className="text-xs">PDF, PNG or JPG up to 10MB</p>}
                         </div>
                     )}
                     <input
@@ -170,25 +174,27 @@ export default function CompanyInfoForm({ userId, initialData, onSuccess }: Comp
                 </div>
             </div>
 
-            <div className="flex justify-end pt-4">
-                <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {saving ? (
-                        <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
-                        </>
-                    ) : (
-                        <>
-                            <Save className="w-4 h-4" />
-                            Save Changes
-                        </>
-                    )}
-                </button>
-            </div>
+            {isAccountant && (
+                <div className="flex justify-end pt-4">
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {saving ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                Save Changes
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
         </form>
     );
 }

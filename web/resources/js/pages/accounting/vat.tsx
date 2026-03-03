@@ -9,7 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const YEARS = ['2023', '2024', '2025', '2026'];
+// Dynamically compute years and current quarter based on current date
+const now = new Date();
+const currentYear = now.getFullYear();
+const YEARS = [`${currentYear - 2}`, `${currentYear - 1}`, `${currentYear}`, `${currentYear + 1}`];
+const DEFAULT_YEAR = `${currentYear}`;
+// Determine current quarter (1=Jan-Mar, 2=Apr-Jun, 3=Jul-Sep, 4=Oct-Dec)
+const DEFAULT_QUARTER = Math.ceil((now.getMonth() + 1) / 3);
 const QUARTERS = [
     { id: 1, label: 'Q1 (Jan-Mar)' },
     { id: 2, label: 'Q2 (Apr-Jun)' },
@@ -26,8 +32,8 @@ export default function VAT({ userId, clientName }: Props) {
     const { auth } = usePage().props as any;
     const isAccountant = auth.user.role === 'accountant';
 
-    const [selectedYear, setSelectedYear] = useState('2025');
-    const [selectedQuarter, setSelectedQuarter] = useState(1);
+    const [selectedYear, setSelectedYear] = useState(DEFAULT_YEAR);
+    const [selectedQuarter, setSelectedQuarter] = useState(DEFAULT_QUARTER);
     const [vatData, setVatData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 

@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force all generated URLs (e.g., routes, redirects) to use HTTPS in production 
+        // to prevent Mixed Content errors when running behind the Caddy proxy
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         $this->configureDefaults();
     }
 
