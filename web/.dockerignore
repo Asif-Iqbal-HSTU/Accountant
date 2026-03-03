@@ -15,7 +15,6 @@
 
 # Environment & IDE
 .env
-.env.*
 .idea/
 .vscode/
 .DS_Store
@@ -28,16 +27,8 @@ docker-compose.yml
 .phpunit.result.cache
 
 # Development & Test Files
-/tests/
-/reports/
-load-test.php
-load-test.yml
-test_api.php
-phpunit.xml
 pint.json
-tsconfig.json
 eslint.config.js
-vite.config.ts
 components.json
 .prettier*
 .editorconfig
@@ -47,8 +38,3 @@ components.json
 *.log
 npm-debug.log
 yarn-error.log
-
-# Legacy/Misc
-Homestead.json
-Homestead.yaml
-.env.example
