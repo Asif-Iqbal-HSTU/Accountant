@@ -1,7 +1,7 @@
 # ==========================================
 # Build Stage 1: Builder (PHP + Node)
 # ==========================================
-FROM php:8.2.28-cli-alpine3.23 AS builder
+FROM php:8.2.30-cli-alpine3.23 AS builder
 RUN apk upgrade --no-cache
 
 # Install system dependencies
@@ -47,7 +47,7 @@ RUN npm ci \
 # ==========================================
 # Build Stage 2: Production PHP Application
 # ==========================================
-FROM php:8.2.28-fpm-alpine3.23
+FROM php:8.2.30-fpm-alpine3.23
 RUN apk upgrade --no-cache
 
 # Only runtime libs needed — no dev packages, no compilation
