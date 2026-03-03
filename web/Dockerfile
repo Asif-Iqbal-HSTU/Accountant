@@ -43,7 +43,7 @@ RUN rm -rf node_modules
 # ==========================================
 # Build Stage 2: Production PHP Application
 # ==========================================
-FROM php:8.2-fpm-alpine
+FROM php:8.4.18-fpm-alpine3.23
 
 # Install system dependencies
 RUN apk add --no-cache \
