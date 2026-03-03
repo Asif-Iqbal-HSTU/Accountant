@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: docker/postgres
     container_name: accountant-db
     restart: unless-stopped
     environment:
@@ -51,7 +53,9 @@ services:
       - frontend
 
   caddy:
-    image: caddy:alpine
+    build:
+      context: .
+      dockerfile: docker/caddy
     container_name: accountant-web-caddy
     restart: unless-stopped
     ports:
